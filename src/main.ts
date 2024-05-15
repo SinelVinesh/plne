@@ -2,6 +2,8 @@ import './style.css'
 import typescriptLogo from './typescript.svg'
 import viteLogo from '/vite.svg'
 import { setupCounter } from './counter.ts'
+import {simplexe} from "./plne.ts";
+import {Matrix} from "ml-matrix";
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div>
@@ -22,3 +24,19 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
 `
 
 setupCounter(document.querySelector<HTMLButtonElement>('#counter')!)
+
+const matrix = new Matrix([
+  [1, -1, 1, 0, 0, 1],
+  [2, -1, 0, 1, 0, 2],
+  [1,  1, 0, 0, 1, 7],
+  [-1, 0, 0, 0, 0, 0]
+])
+const bases = new Map<number,number>()
+bases.set(0,2)
+bases.set(1,3)
+bases.set(2,4)
+
+simplexe("min",matrix,bases)
+
+console.log(matrix)
+console.log(bases)
