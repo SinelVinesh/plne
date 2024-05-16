@@ -63,7 +63,7 @@ function updateSimplexeMatrix(matrix: Matrix, enteringColumn: number[], leavingI
   for (let i = 0; i < enteringColumn.length; i++) {
     if (i != leavingIndex) {
       const substractRow = multiplyVector(leavingRow,enteringColumn[i])
-      let row = matrix.getRow(i)
+      const row = matrix.getRow(i)
       matrix.setRow(i,substractVector(row, substractRow))
     }
   }

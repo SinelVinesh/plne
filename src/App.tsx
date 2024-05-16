@@ -1,33 +1,37 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
 import './App.css'
+import MathTex from "react-mathtex";
+import {useState} from "react";
 
 function App() {
-  const [count, setCount] = useState(0)
-
+  const [linearProgram, setLinearProgram] = useState("")
+  const updateLinearProgram = (input: string) => {
+    const re = /\n/g;
+    input = input.replace(re,"\\\\")
+    setLinearProgram(input)
+  }
   return (
     <>
-      <div>
-        <a href="https://vitejs.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+      <h1 className="mb-8">PLNE Solver</h1>
+      <div className="flex items-center" >
+        <textarea
+          rows={6}
+          cols={30}
+          className="border border-gray-300"
+          onChange={(e) => updateLinearProgram(e.target.value)}
+        />
+        <MathTex classname="h-fit ml-4 text-xl min-w-[200px]">
+          {
+            "<$>\\begin{cases}"+
+            linearProgram+
+            "\\end{cases}</$$>"
+          }
+        </MathTex>
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
+      <div className="flex flex-row-reverse">
+        <button className="bg-blue-500 border-blue-600 text-white mt-2">
+          Solve
         </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
       </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
     </>
   )
 }
