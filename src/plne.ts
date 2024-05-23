@@ -8,7 +8,7 @@ const orderRe = /(?<=x_)\d+/
 const operationRe = /\\leq|\\geq|=/
 
 export function solveLP(linearProgram: string) {
-  const lines = linearProgram.split("\\\\\\\\")
+  const lines = linearProgram.split("\\\\")
   const constraints = getConstraints(lines.slice(1,lines.length))
   const objective = getObjective(lines[0])
   const decisionVariables = objective.coefficients.length
