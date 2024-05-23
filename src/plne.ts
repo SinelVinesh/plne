@@ -2,8 +2,8 @@ import { Matrix } from "ml-matrix"
 import {Coefficient, Constraint, Objective, ProblemType} from "./model.ts";
 import Fraction from "fraction.js";
 
-const coefficientRe = /[-\d]*x_[\d+]/g
-const valueRe = /[-\d]*/
+const coefficientRe = /[-\d/]*x_[\d+]/g
+const valueRe = /[-\d/]*/
 const orderRe = /(?<=x_)\d+/
 const operationRe = /\\leq|\\geq|=/
 
@@ -12,13 +12,56 @@ export function solveLP(linearProgram: string) {
   const constraints = getConstraints(lines.slice(1,lines.length))
   const objective = getObjective(lines[0])
   const decisionVariables = objective.coefficients.length
-  const maxOrder = standardizeProblem(objective,constraints)
-  const matrix = createSimplexeMatrix(objective,constraints, maxOrder+1)
-  const baseVariables = getBaseVariables(constraints)
+  const artificialVariables: number[] = []
+  const maxOrder = standardizeProblem(objective,constraints, artificialVariables)
+  let matrix: Matrix|undefined = undefined
+  let baseVariables: Map<number, number>|undefined = undefined
+  // After standardizing the problem, we need to check if there are artificial variables
+  if (artificialVariables.length > 0) {
+    // we create an auxiliary objective to solve the problem
+    const auxiliarObjective: Objective = {
+      type: "min",
+      coefficients: []
+    }
+    for (const artificialVariable of artificialVariables) {
+      auxiliarObjective.coefficients.push({
+        order: artificialVariable+1,
+        value: -1
+      })
+    }
+    const auxiliaryMatrix = createSimplexeMatrix(auxiliarObjective,constraints, maxOrder+1)
+    const auxiliaryBaseVariables = getBaseVariables(constraints)
+    calculateZ(auxiliaryMatrix, auxiliaryBaseVariables, auxiliarObjective)
+    console.log("Auxiliary Matrix : ")
+    printMatrix(auxiliaryMatrix)
+    // we solve the auxiliary matrix
+    simplexe("min", auxiliaryMatrix, auxiliaryBaseVariables)
+    console.log("Auxiliary Matrix solved : ")
+    printMatrix(auxiliaryMatrix)
+    // we check if the optimal solution of the auxiliary matrix is 0
+    const z = auxiliaryMatrix.get(auxiliaryMatrix.rows - 1, auxiliaryMatrix.columns - 1)
+    if (z != 0) {
+      throw new Error("The problem has no solution")
+    }
+    // we drop the artificial variable columns and return to the original problem
+    for (const artificalVariable of artificialVariables) {
+      auxiliaryMatrix.removeColumn(artificalVariable)
+    }
+    matrix = auxiliaryMatrix
+    baseVariables = auxiliaryBaseVariables
+    objective.type = "min"
+    console.log(" Phase II Matrix : ")
+    printMatrix(matrix)
+  }
   console.log("Objective : ")
   console.log(objective)
   console.log("Constraints : ")
   console.log(constraints)
+  if (matrix == undefined || baseVariables == undefined) {
+    matrix = createSimplexeMatrix(objective, constraints, maxOrder + 1)
+    baseVariables = getBaseVariables(constraints)
+  }
+  calculateZ(matrix,baseVariables,objective)
   console.log("Base Variables : ")
   console.log(baseVariables)
   console.log("Matrix : ")
@@ -32,14 +75,13 @@ export function solveLP(linearProgram: string) {
   const optimalSolution: Coefficient[] = [];
   for (let i = 0; i < decisionVariables; i++) {
     let value = 0
-    if (baseVariables.has(i)) {
-      console.log(baseVariables.get(i))
-      if (baseVariables.get(i)! < matrix.rows) {
-        value = matrix.get(baseVariables.get(i)!, matrix.columns - 1)
+    for (const [key, element] of baseVariables.entries()) {
+      if (element == i) {
+        value = matrix.get(key, matrix.columns - 1)
       }
     }
     if (value % 1 === 0) {
-      console.log(`x_${i+1} = ${value}`)
+      console.log(`x_${i} = ${value}`)
       continue
     }
     const fraction = new Fraction(value)
@@ -78,7 +120,7 @@ function getCoefficients(expression: string, type: string = "Objective"): Coeffi
     if (valueMatch == null || valueMatch.length == 0) {
       throw new Error(`One of the objective ${type.toLowerCase()} is missing`)
     }
-    const value = parseInt(valueMatch[0] == "" ? "1" : valueMatch[0])
+    const value = new Fraction(valueMatch[0] == "" ? "1" : valueMatch[0]).valueOf()
     coefficients.push({
       order: order,
       value: value
@@ -103,7 +145,7 @@ function getConstraint(constraint: string): Constraint {
     throw new Error("One of the constraints is missing an operation or using an invalid one")
   }
   const operation = operationMatch[0] as "\\leq" | "\\geq" | "="
-  const rightHandSide = parseInt(constraint.split(operation)[1])
+  const rightHandSide = new Fraction(constraint.split(operation)[1].trim()).valueOf()
   return {
     coefficients: coefficients,
     operation: operation,
@@ -111,11 +153,19 @@ function getConstraint(constraint: string): Constraint {
   }
 }
 
-function standardizeProblem(objective: Objective, constraints: Constraint[]): number {
+function standardizeProblem(objective: Objective, constraints: Constraint[], artificialVariables: number[]): number {
   let maxOrder = objective.coefficients[objective.coefficients.length - 1].order
   for (let i = 0; i < constraints.length; i++) {
     const constraint = constraints[i]
     switch (constraint.operation) {
+      case "=":
+        maxOrder += 1
+        constraint.coefficients.push({
+          order: maxOrder,
+          value: 1
+        })
+        artificialVariables.push(maxOrder)
+        break
       case "\\leq":
         maxOrder += 1
         constraint.coefficients.push({
@@ -124,6 +174,27 @@ function standardizeProblem(objective: Objective, constraints: Constraint[]): nu
         })
         constraint.operation = "="
         break
+      case "\\geq":
+        maxOrder += 1
+        constraint.coefficients.push({
+          order: maxOrder,
+          value: -1
+        })
+        artificialVariables.push(maxOrder)
+        break
+      default :
+        break
+    }
+  }
+  for (let i = 0; i < constraints.length; i++) {
+    const constraint = constraints[i]
+    if (constraint.operation == "\\geq") {
+      maxOrder += 1
+      constraint.coefficients.push({
+        order: maxOrder,
+        value: 1
+      })
+      constraint.operation = "="
     }
   }
   return maxOrder
@@ -169,11 +240,34 @@ function printMatrix(matrix: Matrix) {
         continue
       }
       const fraction = new Fraction(matrix.get(i, j))
-      row += fraction.n + '/' + fraction.d  + " "
+      row += (fraction.s == -1 ? "-" : "") +fraction.n + '/' + fraction.d  + " "
     }
     result += row + "\n"
   }
   console.log(result)
+}
+
+function calculateZ(matrix: Matrix, baseVariables: Map<number, number>, objective: Objective) {
+  const lastRow = matrix.getRow(matrix.rows - 1)
+  for (let i = 0; i < lastRow.length; i++) {
+    let value = 0;
+    for (const coefficient of objective.coefficients) {
+      if (coefficient.order-1 == i) {
+        value -= coefficient.value
+      }
+    }
+    for (let j = 0; j < matrix.rows; j++) {
+      const matrixValue = matrix.get(j, i)
+      const baseVariable = baseVariables.get(j)
+      for (const coefficient of objective.coefficients) {
+        if (coefficient.order-1 == baseVariable) {
+          value += matrixValue * coefficient.value
+        }
+      }
+    }
+    lastRow[i] = value
+  }
+  matrix.setRow(matrix.rows - 1, lastRow)
 }
 
 /**
