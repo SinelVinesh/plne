@@ -1,11 +1,13 @@
+export type ProblemType = "max" | "min"
+export type Operation = "\\leq" | "\\geq" | "="
 export type Objective = {
-    type: "max" | "min"
+    type: ProblemType
     coefficients: Coefficient[]
 }
 
 export type Constraint = {
     coefficients: Coefficient[]
-    operation: "\\leq" | "\\geq" | "="
+    operation: Operation
     rightHandSide: number
 }
 
