@@ -1,0 +1,8 @@
+th, td {
+    padding: 3px;
+}
+
+input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+}

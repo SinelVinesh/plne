@@ -7,6 +7,7 @@ import {
   RouterProvider
 } from "react-router-dom";
 import Plne from "./plne/Plne.tsx";
+import Coloration from "./coloration/Coloration.tsx";
 
 const router = createBrowserRouter([
   {
@@ -20,6 +21,10 @@ const router = createBrowserRouter([
       {
         path: "/plne",
         element: <Plne />
+      },
+      {
+        path: "/coloration",
+        element: <Coloration />
       },
     ]
   },
