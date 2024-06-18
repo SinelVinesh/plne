@@ -122,6 +122,16 @@ function Coloration() {
 
           </tbody>
         </table>
+        <div className="flex flex-col items-start gap-4">
+          <div className="flex gap-4">
+            <label htmlFor="">Depart :</label>
+            <input type="text" className="border-solid  border-2 w-10"/>
+          </div>
+          <div className="flex gap-4">
+            <label htmlFor="">Arrivee :</label>
+            <input type="text" className="border-solid  border-2 w-10"/>
+          </div>
+        </div>
         <div className="flex flex-row-reverse">
           <button className="bg-blue-500 border-blue-600 text-white mt-2" onClick={() => solveUsingMooreDjikstra()}>
             Solve
