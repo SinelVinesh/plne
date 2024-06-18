@@ -99,7 +99,7 @@ function getCoefficients(expression: string, type: string = "Objective"): Coeffi
     if (valueMatch == null || valueMatch.length == 0) {
       throw new Error(`One of the objective ${type.toLowerCase()} is missing`)
     }
-    const value = new Fraction(valueMatch[0] == "" ? "1" : valueMatch[0]).valueOf()
+    const value = new Fraction(valueMatch[0] == "-" ? "-1" : valueMatch[0] == "" ? "1" : valueMatch[0]).valueOf()
     coefficients.push({
       order: order,
       value: value
@@ -276,7 +276,8 @@ function twoPhaseSimplexe(objective: Objective, constraints: Constraint[]) {
     }
     matrix = auxiliaryMatrix
     baseVariables = auxiliaryBaseVariables
-    objective.type = "min"
+    objective.type = objective.type == "min" ? "max" : "min"
+    calculateZ(matrix, baseVariables, objective)
     // printMatrix(matrix)
   }
   if (matrix == undefined || baseVariables == undefined) {
