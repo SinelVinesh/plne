@@ -1,7 +1,7 @@
 import {Matrix} from "ml-matrix"
-import {Coefficient, Constraint, Objective, ProblemType} from "./model.ts";
+import {Coefficient, Constraint, Objective, ProblemType} from "../model.ts";
 import Fraction from "fraction.js";
-import {copy} from "./util.ts";
+import {copy} from "../util.ts";
 
 const coefficientRe = /[-\d/]*x_[\d+]/g
 const valueRe = /[-\d/]*/
