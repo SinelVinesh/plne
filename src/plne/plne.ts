@@ -270,8 +270,9 @@ function twoPhaseSimplexe(objective: Objective, constraints: Constraint[]) {
       throw new Error("The problem has no solution")
     }
     // we drop the artificial variable columns and return to the original problem
-    for (const artificalVariable of artificialVariables) {
-      auxiliaryMatrix.removeColumn(artificalVariable)
+    artificialVariables.sort()
+    for (let i = 0; i < artificialVariables.length; i++) {
+      auxiliaryMatrix.removeColumn(artificialVariables[i] - i)
     }
     matrix = auxiliaryMatrix
     baseVariables = auxiliaryBaseVariables
