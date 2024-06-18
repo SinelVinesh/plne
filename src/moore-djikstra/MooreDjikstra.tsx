@@ -1,10 +1,14 @@
 import "./MooreDjikstra.css"
 import {useEffect, useState} from "react";
+import {getShortestPathUsingMooreDjikstra, Pi} from "./mooreDjikstra.ts";
 
 const defaultNodeNumber = 5
 
 function Coloration() {
   const [graph, setGraph] = useState<number[][]>([])
+  const [start, setStart] = useState("")
+  const [end, setEnd] = useState("")
+  const [path, setPath] = useState<Pi>({ value: 0, path: [], visited: false})
 
   const initGraph = (n: number) => {
     const newGraph = []
@@ -21,12 +25,9 @@ function Coloration() {
   }
 
   const updateGraph = (i: number, j: number, value: number) => {
-    isNaN(value) ? console.log("NaN") : console.log(value)
     const newGraph = graph
-    newGraph[i][j] = value ? value : 0
-    newGraph[j][i] = value ? value : 0
+    newGraph[i][j] = value
     setGraph(newGraph)
-    document.getElementById(`node-${j}-${i}`)?.setAttribute("value", isNaN(value) ? "" : value.toString())
   }
 
   const expandGraph = (n: number) => {
@@ -57,7 +58,7 @@ function Coloration() {
     if (!isNaN(n) && n > 0) {
       const theadRow = document.querySelector("thead>tr")
       if (theadRow) {
-        theadRow.innerHTML = "<th>-</th>"
+        theadRow.innerHTML = "<th>-></th>"
         for (let i = 0; i < n; i++) {
           const th = document.createElement("th")
           th.textContent = String.fromCharCode(initialCharCode + i)
@@ -97,6 +98,7 @@ function Coloration() {
   }
 
   const solveUsingMooreDjikstra = () => {
+    setPath(getShortestPathUsingMooreDjikstra(graph, start.charCodeAt(0) - "A".charCodeAt(0), end.charCodeAt(0) - "A".charCodeAt(0)))
   }
 
   useEffect(() => {
@@ -115,7 +117,7 @@ function Coloration() {
         <table className="mb-8">
           <thead>
           <tr>
-            <th>-</th>
+            <th>-{">"}</th>
           </tr>
           </thead>
           <tbody>
@@ -125,11 +127,11 @@ function Coloration() {
         <div className="flex flex-col items-start gap-4">
           <div className="flex gap-4">
             <label htmlFor="">Depart :</label>
-            <input type="text" className="border-solid  border-2 w-10"/>
+            <input type="text" className="border-solid  border-2 w-10" value={start} onChange={(e) => setStart(e.target.value)}/>
           </div>
           <div className="flex gap-4">
             <label htmlFor="">Arrivee :</label>
-            <input type="text" className="border-solid  border-2 w-10"/>
+            <input type="text" className="border-solid  border-2 w-10" value={end} onChange={(e) => setEnd(e.target.value)}/>
           </div>
         </div>
         <div className="flex flex-row-reverse">
@@ -138,6 +140,15 @@ function Coloration() {
           </button>
         </div>
       </div>
+      {path.value != 0 && path.path.length > 0 &&
+      <div>
+        <h2 className="mt-8 mb-4 font-bold text-2xl">Shortest path</h2>
+        <p><span className="font-bold text-lg">Distance :</span> {path.value}</p>
+          {path.path.map((node, index) => (
+              <span className="text-lg" key={index}><span className="font-bold">{String.fromCharCode(node + "A".charCodeAt(0))}</span> <span>{((index != path.path.length - 1) ? " => " : "")}</span></span>
+          ))}
+      </div>
+      }
     </>
   )
 }
