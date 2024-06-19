@@ -9,6 +9,7 @@ import {
 import Plne from "./plne/Plne.tsx";
 import Coloration from "./coloration/Coloration.tsx";
 import MooreDjikstra from "./moore-djikstra/MooreDjikstra.tsx";
+import FordFulkerson from "./ford-fulkerson/FordFulkerson.tsx";
 
 const router = createBrowserRouter([
   {
@@ -31,6 +32,10 @@ const router = createBrowserRouter([
         path: "/moore-djikstra",
         element: <MooreDjikstra />
       },
+      {
+        path: "/ford-fulkerson",
+        element: <FordFulkerson />
+      }
     ]
   },
 ])
