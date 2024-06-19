@@ -1,11 +1,11 @@
 import "./FordFulkerson.css"
 import {useEffect, useState} from "react";
-import {FlowNode, MaximumFlowData, getMaximumFlowData} from "./fordFulkerson.ts";
+import {FlowArc, MaximumFlowData, getMaximumFlowData} from "./fordFulkerson.ts";
 
-const defaultNodeNumber = 6
+const defaultNodeNumber = 11
 
 function FordFulkerson() {
-  const [graph, setGraph] = useState<FlowNode[][]>([])
+  const [graph, setGraph] = useState<FlowArc[][]>([])
   const [start, setStart] = useState("")
   const [end, setEnd] = useState("")
   const [maximumFlowData, setMaximumFlowData] = useState<MaximumFlowData | undefined>(undefined)
@@ -13,12 +13,12 @@ function FordFulkerson() {
   const initGraph = (n: number) => {
     const newGraph = []
     for (let i = 0; i < n; i++) {
-      newGraph.push([] as FlowNode[])
+      newGraph.push([] as FlowArc[])
       for (let j = 0; j < n; j++) {
         if (i === j) {
-          newGraph[i].push({ flow: 0, capacity: 0, visited: false})
+          newGraph[i].push({ flow: 0, capacity: 0})
         }
-        newGraph[i].push({ flow: NaN, capacity: NaN, visited: false })
+        newGraph[i].push({ flow: NaN, capacity: NaN })
       }
     }
     setGraph(newGraph)
@@ -27,10 +27,10 @@ function FordFulkerson() {
   const updateGraph = (i: number, j: number, flow: number|undefined, capacity: number|undefined) => {
     const newGraph = graph
     if (newGraph[i][j] === undefined) {
-      newGraph[i][j] = { flow: flow ?? 0, capacity: capacity ?? 0, visited: false }
+      newGraph[i][j] = { flow: flow ?? 0, capacity: capacity ?? 0 }
     } else {
       const node = newGraph[i][j]
-      newGraph[i][j] = { flow: flow ?? ((isNaN(node.flow) && !isNaN(node.capacity)) ? 0 : node.flow), capacity: capacity ?? node.capacity, visited: node.visited }
+      newGraph[i][j] = { flow: flow ?? (isNaN(node.flow) && (capacity !== undefined && !isNaN(capacity)) ? 0 : node.flow), capacity: capacity ?? node.capacity }
     }
     document.getElementById(`arc-${i}-${j}-flow`)?.setAttribute("value", isNaN(newGraph[i][j].flow) ? "NaN" : newGraph[i][j].flow.toString())
     setGraph(newGraph)
@@ -41,14 +41,14 @@ function FordFulkerson() {
     console.log(newGraph)
     for (let i = 0; i < n; i++) {
       if (newGraph[i] === undefined) {
-        newGraph.push([] as FlowNode[])
+        newGraph.push([] as FlowArc[])
       }
       for (let j = 0; j < n; j++) {
         if (newGraph[i][j] === undefined) {
           if (i === j) {
-            newGraph[i].push({ flow: 0, capacity: 0, visited: false })
+            newGraph[i].push({ flow: 0, capacity: 0 })
           } else {
-            newGraph[i].push({ flow: NaN, capacity: NaN, visited: false })
+            newGraph[i].push({ flow: NaN, capacity: NaN })
           }
         }
       }

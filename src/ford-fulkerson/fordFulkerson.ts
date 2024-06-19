@@ -1,11 +1,10 @@
-export type FlowNode = {
+export type FlowArc = {
     flow: number,
     capacity: number,
-    visited: boolean,
 }
 
 export type MaximumFlowData = {
-    graph: FlowNode[][],
+    graph: FlowArc[][],
     source: number,
     sink: number,
     maxFlow: number,
@@ -18,9 +17,9 @@ type AdvancedPathArc = {
     mark: "+" | "-"
 }
 
-export function getMaximumFlowData(graph: FlowNode[][], source: number, sink: number): MaximumFlowData {
+export function getMaximumFlowData(graph: FlowArc[][], source: number, sink: number): MaximumFlowData {
     const graphCopy = copyGraph(graph)
-    let advancedPath = findAdvancedPath(graphCopy, source, sink, [])
+    let advancedPath = findAdvancedPath(graphCopy, source, sink, [],new Array(graphCopy.length).fill(false))
     while (advancedPath != undefined) {
         let minFlow = Infinity
         for (const arc of advancedPath) {
@@ -33,23 +32,25 @@ export function getMaximumFlowData(graph: FlowNode[][], source: number, sink: nu
                 graphCopy[arc.to][arc.from].flow -= minFlow
             }
         }
-        advancedPath = findAdvancedPath(graphCopy, source, sink, [])
+
+        advancedPath = findAdvancedPath(graphCopy, source, sink, [], new Array(graphCopy.length).fill(false))
     }
     return {graph: graphCopy, source: source, sink: sink, maxFlow: graphCopy[source].reduce((acc, node) => acc + (isNaN(node.flow) ? 0 : node.flow), 0)}
 }
 
-function findAdvancedPath(graph: FlowNode[][], current: number, sink: number, path: AdvancedPathArc[]): AdvancedPathArc[] | undefined {
+function findAdvancedPath(graph: FlowArc[][], current: number, sink: number, path: AdvancedPathArc[], visited: boolean[]): AdvancedPathArc[] | undefined {
+    visited[current] = true
     if (current === sink) {
         return path
     }
     const currentRow = graph[current]
     for (let i = 0; i < currentRow.length; i++) {
         const gap = currentRow[i].capacity - currentRow[i].flow
-        if (i != current && !isNaN(currentRow[i].capacity) && gap > 0 && !currentRow[i].visited) {
+        if (i != current && !isNaN(currentRow[i].capacity) && gap > 0 && !visited[i]) {
             path.push({ from: current, to: i, gap: gap, mark: "+" })
-            currentRow[i].visited = true
-            const result = findAdvancedPath(graph, i, sink, path)
-            currentRow[i].visited = false
+            visited[i] = true
+            const result = findAdvancedPath(graph, i, sink, path, visited)
+            visited[i] = false
             if (result != undefined) {
                 return result
             }
@@ -57,11 +58,11 @@ function findAdvancedPath(graph: FlowNode[][], current: number, sink: number, pa
         }
     }
     for (let i = 0; i < graph.length; i++) {
-        if (i != current && !isNaN(graph[i][current].capacity) && graph[i][current].flow > 0 && !graph[i][current].visited) {
+        if (i != current && !isNaN(graph[i][current].capacity) && graph[i][current].flow > 0 && !visited[i]) {
             path.push({from: i, to: current, gap: graph[i][current].flow, mark: "-"})
-            graph[i][current].visited = true
-            const result = findAdvancedPath(graph, i, sink, path)
-            currentRow[i].visited = false
+            visited[i] = true
+            const result = findAdvancedPath(graph, i, sink, path,visited)
+            visited[i] = false
             if (result != undefined) {
                 return result
             }
@@ -71,12 +72,12 @@ function findAdvancedPath(graph: FlowNode[][], current: number, sink: number, pa
     return undefined
 }
 
-function copyGraph(graph: FlowNode[][]): FlowNode[][] {
+function copyGraph(graph: FlowArc[][]): FlowArc[][] {
     const newGraph = []
     for (let i = 0; i < graph.length; i++) {
-        newGraph.push([] as FlowNode[])
+        newGraph.push([] as FlowArc[])
         for (let j = 0; j < graph[i].length; j++) {
-            newGraph[i].push({flow: graph[i][j].flow, capacity: graph[i][j].capacity, visited: false})
+            newGraph[i].push({flow: graph[i][j].flow, capacity: graph[i][j].capacity})
         }
     }
     return newGraph
