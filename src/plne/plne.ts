@@ -25,10 +25,10 @@ export function brunchAndBound(linearProgram: string) {
   const lines = linearProgram.split("\\\\")
   const constraints = getConstraints(lines.slice(1,lines.length))
   const objective = getObjective(lines[0])
-  return brunchAndBoundRecursive(objective, constraints, [], {value: NaN})
+  return brunchAndBoundRecursive(objective, constraints, {Z: NaN, coefficients: []}, {value: NaN})
 }
 
-function brunchAndBoundRecursive(objective: Objective, constraints: Constraint[], coefficients: Coefficient[] = [], solution: {value: number}, depth: number = 0) {
+function brunchAndBoundRecursive(objective: Objective, constraints: Constraint[], result: LPResult, solution: {value: number}, depth: number = 0): LPResult {
 
   const twoPhaseSolution = twoPhaseSimplexe(copy(objective), copy(constraints))
   const optimalSolution = calculateSolution(twoPhaseSolution.coefficients, objective.coefficients)
@@ -39,32 +39,32 @@ function brunchAndBoundRecursive(objective: Objective, constraints: Constraint[]
         operation: "\\leq",
         rightHandSide: Math.floor(coefficient.value)
       }
-      const leqCoefficient: Coefficient[] = brunchAndBoundRecursive(objective, [...constraints, leqConstraint],coefficients, solution, depth + 1)
+      const leqResult: LPResult = brunchAndBoundRecursive(objective, [...constraints, leqConstraint],result, solution, depth + 1)
       const geqConstraint: Constraint = {
         coefficients: [{order: coefficient.order, value: 1}],
         operation: "\\geq",
         rightHandSide: Math.ceil(coefficient.value)
       }
-      const geqCoefficient: Coefficient[] = brunchAndBoundRecursive(objective, [...constraints, geqConstraint],coefficients, solution, depth + 1)
+      const geqResult: LPResult = brunchAndBoundRecursive(objective, [...constraints, geqConstraint],result, solution, depth + 1)
       if (objective.type == "max") {
-        if (calculateSolution(leqCoefficient, objective.coefficients) > calculateSolution(geqCoefficient, objective.coefficients)) {
-          return leqCoefficient
+        if (calculateSolution(leqResult.coefficients, objective.coefficients) > calculateSolution(geqResult.coefficients, objective.coefficients)) {
+          return leqResult
         } else {
-          return geqCoefficient
+          return geqResult
         }
       } else {
-        if (calculateSolution(leqCoefficient, objective.coefficients) < calculateSolution(geqCoefficient, objective.coefficients)) {
-          return leqCoefficient
+        if (calculateSolution(leqResult.coefficients, objective.coefficients) < calculateSolution(geqResult.coefficients, objective.coefficients)) {
+          return leqResult
         } else {
-          return geqCoefficient
+          return geqResult
         }
       }
     }
   }
   if (isNaN(solution.value) || (objective.type == "max" && solution.value < optimalSolution) || (objective.type == "min" && solution.value > optimalSolution)) {
-    coefficients = twoPhaseSolution.coefficients
+    result = twoPhaseSolution
   }
-  return coefficients
+  return result
 }
 
 function calculateSolution(optimalCoefficient: Coefficient[], objective: Coefficient[]) {
@@ -93,7 +93,7 @@ function getCoefficients(expression: string, type: string = "Objective"): Coeffi
   const matches = expression.match(coefficientRe)
   const coefficients: Coefficient[] = []
   if (matches == null) {
-    throw new Error(`${type} expression must have at least one coefficient`)
+    throw new Error(`${type} expression must have at least one coefficient or the input contains empty lines `)
   }
   for (const match of matches) {
     const orderMatch = match.match(orderRe)

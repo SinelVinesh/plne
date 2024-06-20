@@ -2,24 +2,24 @@ import MathTex from "react-mathtex";
 import React, {useState} from "react";
 import {brunchAndBound, LPResult, solveLP} from "./plne.ts";
 
-import {Coefficient} from "../model.ts";
 import Fraction from "fraction.js";
 
 function formatFrac(value: number) {
   const fraction = new Fraction(value)
   if (fraction.d === 1) {
-    return fraction.n.toString()
+    return `${fraction.s == 1 ? "" : "-"}${fraction.n}`
   }
-  return `${fraction.n}/${fraction.d}`
+  return `${fraction.s == 1 ? "" : "-"}${fraction.n}/${fraction.d}`
 }
 
 function Plne() {
   const [linearProgram, setLinearProgram] = useState("");
   const [integerProgrammingOutput, setIntegerProgrammingOutput] = useState("");
   const [integerProgramming, setIntegerProgramming] = useState(false);
-  const [solutionCoefficients, setSolutionCoefficients] = useState<Coefficient[]>([])
   const [solution, setSolution] = useState<LPResult|undefined>(undefined)
+  const [error, setError] = useState<string>("")
   const updateLinearProgram = (input: string) => {
+    setError("")
     const re = /\n/g
     input = input.replace(re,"\\\\")
     formatIntegerProgrammingOutput(input)
@@ -44,12 +44,16 @@ function Plne() {
   const handleSolve = () => {
     try {
       if (integerProgramming) {
-        setSolutionCoefficients(brunchAndBound(linearProgram))
+        setSolution(brunchAndBound(linearProgram))
       } else {
         setSolution(solveLP(linearProgram))
       }
     } catch (e) {
-      console.log(e)
+      if (e instanceof Error) {
+        console.log(e.message)
+        setError(e.message)
+
+      }
     }
   }
   const handleIntegerProgramming = (event: React.MouseEvent<HTMLInputElement,MouseEvent>) => {
@@ -101,6 +105,11 @@ function Plne() {
               }
             </MathTex>
         </div>
+      }
+      {error != "" && <div>
+        <h2 className="mt-8 mb-4 text-2xl font-bold text-red-400">Error</h2>
+        <h2 className="mb-8 text-xl font-bold text-red-400">{error}</h2>
+      </div>
       }
     </>
   )
