@@ -1,14 +1,24 @@
 import MathTex from "react-mathtex";
 import React, {useState} from "react";
-import {brunchAndBound, solveLP} from "./plne.ts";
+import {brunchAndBound, LPResult, solveLP} from "./plne.ts";
 
 import {Coefficient} from "../model.ts";
+import Fraction from "fraction.js";
+
+function formatFrac(value: number) {
+  const fraction = new Fraction(value)
+  if (fraction.d === 1) {
+    return fraction.n.toString()
+  }
+  return `${fraction.n}/${fraction.d}`
+}
 
 function Plne() {
   const [linearProgram, setLinearProgram] = useState("");
   const [integerProgrammingOutput, setIntegerProgrammingOutput] = useState("");
   const [integerProgramming, setIntegerProgramming] = useState(false);
   const [solutionCoefficients, setSolutionCoefficients] = useState<Coefficient[]>([])
+  const [solution, setSolution] = useState<LPResult|undefined>(undefined)
   const updateLinearProgram = (input: string) => {
     const re = /\n/g
     input = input.replace(re,"\\\\")
@@ -36,7 +46,7 @@ function Plne() {
       if (integerProgramming) {
         setSolutionCoefficients(brunchAndBound(linearProgram))
       } else {
-        setSolutionCoefficients(solveLP(linearProgram))
+        setSolution(solveLP(linearProgram))
       }
     } catch (e) {
       console.log(e)
@@ -78,18 +88,20 @@ function Plne() {
           Solve
         </button>
       </div>
-      { solutionCoefficients.length != 0 && <div>
-          <h2>Solution optimal du problem</h2>
-          <MathTex classname="h-fit ml-4 text-xl min-w-[200px]">
-            {
-              "<$>\\begin{cases}"+
-              solutionCoefficients.map((coefficient) => {
-                return `x_{${coefficient.order+1}} = ${coefficient.value}`
-              }).join("\\\\") +
-              "\\end{cases}</$$>"
-            }
-          </MathTex>
-      </div>}
+      {solution != undefined && solution.coefficients.length != 0 && <div>
+            <h2 className="mt-4 mb-8 text-2xl font-bold">Solution optimal du problem</h2>
+            <MathTex classname="h-fit ml-4 text-xl min-w-[200px]">
+              {
+                "<$>\\begin{cases}"+
+                solution.coefficients.map((coefficient) => {
+                  return `x_{${coefficient.order}} = ${formatFrac(coefficient.value)}`
+                }).join("\\\\") +
+                "\\\\Z= "+formatFrac(solution.Z)+
+                "\\end{cases}</$$>"
+              }
+            </MathTex>
+        </div>
+      }
     </>
   )
 }

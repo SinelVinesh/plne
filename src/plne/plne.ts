@@ -3,10 +3,16 @@ import {Coefficient, Constraint, Objective, ProblemType} from "../model.ts";
 import Fraction from "fraction.js";
 import {copy} from "../util.ts";
 
+export type LPResult = {
+  Z: number,
+  coefficients: Coefficient[]
+}
+
 const coefficientRe = /[-\d/]*x_[\d+]/g
 const valueRe = /[-\d/]*/
 const orderRe = /(?<=x_)\d+/
 const operationRe = /\\leq|\\geq|=/
+
 
 export function solveLP(linearProgram: string) {
   const lines = linearProgram.split("\\\\")
@@ -24,9 +30,9 @@ export function brunchAndBound(linearProgram: string) {
 
 function brunchAndBoundRecursive(objective: Objective, constraints: Constraint[], coefficients: Coefficient[] = [], solution: {value: number}, depth: number = 0) {
 
-  const optimalCoefficient = twoPhaseSimplexe(copy(objective), copy(constraints))
-  const optimalSolution = calculateSolution(optimalCoefficient, objective.coefficients)
-  for (const coefficient of optimalCoefficient) {
+  const twoPhaseSolution = twoPhaseSimplexe(copy(objective), copy(constraints))
+  const optimalSolution = calculateSolution(twoPhaseSolution.coefficients, objective.coefficients)
+  for (const coefficient of twoPhaseSolution.coefficients) {
     if (coefficient.value % 1 !== 0) {
       const leqConstraint: Constraint = {
         coefficients: [{order: coefficient.order, value: 1}],
@@ -56,7 +62,7 @@ function brunchAndBoundRecursive(objective: Objective, constraints: Constraint[]
     }
   }
   if (isNaN(solution.value) || (objective.type == "max" && solution.value < optimalSolution) || (objective.type == "min" && solution.value > optimalSolution)) {
-    coefficients = optimalCoefficient
+    coefficients = twoPhaseSolution.coefficients
   }
   return coefficients
 }
@@ -94,7 +100,7 @@ function getCoefficients(expression: string, type: string = "Objective"): Coeffi
     if (orderMatch == null || orderMatch.length == 0) {
       throw new Error(`One of the ${type.toLowerCase()} variable have a syntax error`)
     }
-    const order = parseInt(orderMatch[0]) - 1
+    const order = parseInt(orderMatch[0])
     const valueMatch = match.match(valueRe)
     if (valueMatch == null || valueMatch.length == 0) {
       throw new Error(`One of the objective ${type.toLowerCase()} is missing`)
@@ -170,20 +176,29 @@ function standardizeProblem(objective: Objective, constraints: Constraint[], art
   return maxOrder
 }
 
-function createSimplexeMatrix(objective: Objective, constraints: Constraint[], columns: number): Matrix {
-  const rows = constraints.length + 1
+function createSimplexeMatrix(objective: Objective, constraints: Constraint[], baseVariables:Map<number,number>, columns: number): Matrix {
+  const rows = constraints.length + 2
   const matrix = new Matrix(rows, columns)
+  for (let i = 1; i < columns-1; i++) {
+    matrix.set(0, i, i)
+  }
+  matrix.set(0, columns-1, NaN)
+  matrix.set(0, 0, NaN)
   for (let i = 0; i < constraints.length; i++) {
     const constraint = constraints[i]
     for (let j = 0; j < constraint.coefficients.length; j++) {
       const coefficient = constraint.coefficients[j]
-      matrix.set(i, coefficient.order, coefficient.value)
+      matrix.set(i+1, coefficient.order, coefficient.value)
     }
-    matrix.set(i, columns-1, constraint.rightHandSide)
+    matrix.set(i+1, columns-1, constraint.rightHandSide)
   }
   for (let i = 0; i < objective.coefficients.length; i++) {
     const coefficient = objective.coefficients[i]
     matrix.set(rows - 1, coefficient.order, coefficient.value)
+  }
+  matrix.set(rows-1,0,NaN)
+  for (const [key, value] of baseVariables.entries()) {
+    matrix.set(key+1, 0, value)
   }
   return matrix
 }
@@ -200,38 +215,22 @@ function getBaseVariables(constraints: Constraint[]): Map<number, number> {
   return baseVariables
 }
 
-// function printMatrix(matrix: Matrix) {
-//   let result = ""
-//   for (let i = 0; i < matrix.rows; i++) {
-//     let row = ""
-//     for (let j = 0; j < matrix.columns; j++) {
-//       if (matrix.get(i, j) % 1 === 0) {
-//         row += matrix.get(i, j) + " "
-//         continue
-//       }
-//       const fraction = new Fraction(matrix.get(i, j))
-//       row += (fraction.s == -1 ? "-" : "") +fraction.n + '/' + fraction.d  + " "
-//     }
-//     result += row + "\n"
-//   }
-//   console.log(result)
-// }
-
-function calculateZ(matrix: Matrix, baseVariables: Map<number, number>, objective: Objective) {
+function calculateZ(matrix: Matrix, objective: Objective) {
   const lastRow = matrix.getRow(matrix.rows - 1)
-  for (let i = 0; i < lastRow.length; i++) {
+  const firstRow = matrix.getRow(0)
+  for (let i = 1; i < lastRow.length; i++) {
     let value = 0;
     for (const coefficient of objective.coefficients) {
-      if (coefficient.order == i) {
-        value -= coefficient.value
+      if (coefficient.order == firstRow[i]) {
+        value += coefficient.value
       }
     }
-    for (let j = 0; j < matrix.rows; j++) {
+    for (let j = 1; j < matrix.rows; j++) {
       const matrixValue = matrix.get(j, i)
-      const baseVariable = baseVariables.get(j)
+      const baseVariable = matrix.get(j,0)
       for (const coefficient of objective.coefficients) {
         if (coefficient.order == baseVariable) {
-          value += matrixValue * coefficient.value
+          value -= matrixValue * coefficient.value
         }
       }
     }
@@ -240,7 +239,7 @@ function calculateZ(matrix: Matrix, baseVariables: Map<number, number>, objectiv
   matrix.setRow(matrix.rows - 1, lastRow)
 }
 
-function twoPhaseSimplexe(objective: Objective, constraints: Constraint[]) {
+function twoPhaseSimplexe(objective: Objective, constraints: Constraint[]): LPResult {
   const decisionVariables = objective.coefficients.length
   const artificialVariables: number[] = []
   const maxOrder = standardizeProblem(objective,constraints, artificialVariables)
@@ -256,58 +255,75 @@ function twoPhaseSimplexe(objective: Objective, constraints: Constraint[]) {
     for (const artificialVariable of artificialVariables) {
       auxiliarObjective.coefficients.push({
         order: artificialVariable,
-        value: -1
+        value: 1
       })
     }
-    const auxiliaryMatrix = createSimplexeMatrix(auxiliarObjective,constraints, maxOrder+2)
     const auxiliaryBaseVariables = getBaseVariables(constraints)
-    calculateZ(auxiliaryMatrix, auxiliaryBaseVariables, auxiliarObjective)
+    const auxiliaryMatrix = createSimplexeMatrix(auxiliarObjective,constraints,auxiliaryBaseVariables, maxOrder+2)
+    calculateZ(auxiliaryMatrix, auxiliarObjective)
     // we solve the auxiliary matrix
-    simplexe("min", auxiliaryMatrix, auxiliaryBaseVariables)
+    simplexe("min", auxiliaryMatrix)
     // we check if the optimal solution of the auxiliary matrix is 0
     const z = auxiliaryMatrix.get(auxiliaryMatrix.rows - 1, auxiliaryMatrix.columns - 1)
     if (z != 0) {
       throw new Error("The problem has no solution")
     }
-    // we drop the artificial variable columns and return to the original problem
-    artificialVariables.sort()
-    for (let i = 0; i < artificialVariables.length; i++) {
-      auxiliaryMatrix.removeColumn(artificialVariables[i] - i)
+    // Remove artificial variable which are not in the base
+    let bases = auxiliaryMatrix.getColumn(0)
+    bases = bases.slice(1, bases.length)
+    bases = bases.slice(0, bases.length - 1)
+    for (const artificial of artificialVariables) {
+      let skip = false
+      for (const base of bases) {
+        if (artificial == base) {
+          skip = true
+          break
+        }
+      }
+      if (!skip) {
+        removeColumn(auxiliaryMatrix, artificial)
+      }
     }
+    // Remove non-base variables with a Z value of 1
+    const lastRow = auxiliaryMatrix.getRow(auxiliaryMatrix.rows - 1)
+    const firstRow = auxiliaryMatrix.getRow(0)
+    for (let i = 1; i < lastRow.length; i++) {
+      if (lastRow[i] == 1) {
+        removeColumn(auxiliaryMatrix, firstRow[i])
+      }
+    }
+
     matrix = auxiliaryMatrix
     baseVariables = auxiliaryBaseVariables
-    objective.type = objective.type == "min" ? "max" : "min"
-    calculateZ(matrix, baseVariables, objective)
+    calculateZ(matrix, objective)
     // printMatrix(matrix)
   }
   if (matrix == undefined || baseVariables == undefined) {
-    matrix = createSimplexeMatrix(objective, constraints, maxOrder + 2)
     baseVariables = getBaseVariables(constraints)
+    matrix = createSimplexeMatrix(objective, constraints,baseVariables, maxOrder + 2)
   }
-  simplexe(objective.type, matrix, baseVariables)
+  simplexe(objective.type, matrix)
   const optimalSolution: Coefficient[] = [];
-  for (let i = 0; i < decisionVariables; i++) {
-    let value = 0
-    for (const [key, element] of baseVariables.entries()) {
-      if (element == i) {
-        value = matrix.get(key, matrix.columns - 1)
-      }
+  for (let i = 1; i < matrix.rows-1;i++) {
+    if (matrix.get(i,0) < decisionVariables) {
+      optimalSolution.push({
+        order: matrix.get(i,0),
+        value: matrix.get(i,matrix.columns-1)
+      })
     }
-    optimalSolution.push({
-      order: i,
-      value: value
-    })
   }
-  return optimalSolution
+  return {
+    Z: -matrix.get(matrix.rows-1,matrix.columns-1),
+    coefficients: optimalSolution
+  }
 }
 
 /**
  * Implementation of the simplexe algorithm to solve linear programming problems
  * @param problemType
  * @param matrix
- * @param baseVariables
  */
-export function simplexe(problemType: ProblemType, matrix:Matrix, baseVariables: Map<number, number>) {
+export function simplexe(problemType: ProblemType, matrix:Matrix) {
   let enteringIndex = getEnteringVariableIndex(problemType, matrix)
   while (enteringIndex != -1) {
     const enteringColumn = matrix.getColumn(enteringIndex)
@@ -316,9 +332,15 @@ export function simplexe(problemType: ProblemType, matrix:Matrix, baseVariables:
     if (leavingIndex != -1) {
       let leavingRow = matrix.getRow(leavingIndex)
       const pivot = matrix.get(leavingIndex, enteringIndex)
-      leavingRow = leavingRow.map((value) => value / pivot)
+      leavingRow = leavingRow.map((value, index) => {
+        if (index != 0) {
+          return value / pivot
+        }
+        return value
+      })
       matrix.setRow(leavingIndex, leavingRow)
-      baseVariables.set(leavingIndex, enteringIndex)
+      const enteringVariable = matrix.get(0, enteringIndex)
+      matrix.set(leavingIndex, 0, enteringVariable)
       
       updateSimplexeMatrix(matrix,enteringColumn,leavingIndex)
     }
@@ -330,7 +352,7 @@ function getEnteringVariableIndex(problemType: ProblemType, matrix:Matrix): numb
   const lastRow = matrix.getRow(matrix.rows - 1)
   let value = undefined
   let index = -1
-  for (let i = 0; i < lastRow.length-1; i++) {
+  for (let i = 1; i < lastRow.length-1; i++) {
     if (problemType == "max" && (value == undefined || (value < lastRow[i])) && (lastRow[i] > 0)) {
       value = lastRow[i]
       index = i
@@ -345,7 +367,7 @@ function getEnteringVariableIndex(problemType: ProblemType, matrix:Matrix): numb
 function getLeavingVariableIndex(enteringColumn: number[], lastColumn: number[]): number {
   let quotient = undefined
   let index = -1
-  for (let i = 0; i < enteringColumn.length - 1; i++) {
+  for (let i = 1; i < enteringColumn.length - 1; i++) {
     if (enteringColumn[i] > 0) {
       const rowQuotient = lastColumn[i] / enteringColumn[i]
       if (quotient == undefined || quotient > rowQuotient) {
@@ -360,19 +382,39 @@ function getLeavingVariableIndex(enteringColumn: number[], lastColumn: number[])
 function updateSimplexeMatrix(matrix: Matrix, enteringColumn: number[], leavingIndex: number) {
   const leavingRow =  matrix.getRow(leavingIndex)
   
-  for (let i = 0; i < enteringColumn.length; i++) {
+  for (let i = 1; i < enteringColumn.length; i++) {
     if (i != leavingIndex) {
-      const substractRow = multiplyVector(leavingRow,enteringColumn[i])
+      const subtractRow = multiplySimplexeRow(leavingRow,enteringColumn[i])
       const row = matrix.getRow(i)
-      matrix.setRow(i,substractVector(row, substractRow))
+      matrix.setRow(i,subtractSimplexRow(row, subtractRow))
     }
   }
 }
 
-function multiplyVector(vector: number[], scalar: number) {
-  return vector.map((element) => element * scalar)
+function multiplySimplexeRow(vector: number[], scalar: number) {
+  return vector.map((element, index) => {
+    if (index != 0) {
+      return element * scalar
+    }
+    return element
+  })
 }
 
-function substractVector(vector: number[], toSubstract: number[]) {
-  return vector.map((element, index) => element - toSubstract[index])
+function subtractSimplexRow(vector: number[], toSubstract: number[]) {
+  return vector.map((element, index) => {
+    if (index != 0) {
+      return element - toSubstract[index]
+    }
+    return element
+  })
+}
+
+function removeColumn(matrix: Matrix, column: number) {
+  const firstRow = matrix.getRow(0)
+  for (let i = 0; i < firstRow.length; i++) {
+    if (firstRow[i] == column) {
+      matrix.removeColumn(i)
+      return
+    }
+  }
 }
