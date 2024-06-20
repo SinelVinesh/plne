@@ -7,8 +7,7 @@ const defaultNodeNumber = 5
 function Coloration() {
   const [graph, setGraph] = useState<number[][]>([])
   const [start, setStart] = useState("")
-  const [end, setEnd] = useState("")
-  const [path, setPath] = useState<Pi>({ value: 0, path: [], visited: false})
+  const [path, setPath] = useState<Map<number,Pi> | undefined>(undefined)
 
   const initGraph = (n: number) => {
     const newGraph = []
@@ -98,7 +97,7 @@ function Coloration() {
   }
 
   const solveUsingMooreDjikstra = () => {
-    setPath(getShortestPathUsingMooreDjikstra(graph, start.charCodeAt(0) - "A".charCodeAt(0), end.charCodeAt(0) - "A".charCodeAt(0)))
+    setPath(getShortestPathUsingMooreDjikstra(graph, start.charCodeAt(0) - "A".charCodeAt(0)))
   }
 
   useEffect(() => {
@@ -129,10 +128,6 @@ function Coloration() {
             <label htmlFor="">Depart :</label>
             <input type="text" className="border-solid  border-2 w-10" value={start} onChange={(e) => setStart(e.target.value)}/>
           </div>
-          <div className="flex gap-4">
-            <label htmlFor="">Arrivee :</label>
-            <input type="text" className="border-solid  border-2 w-10" value={end} onChange={(e) => setEnd(e.target.value)}/>
-          </div>
         </div>
         <div className="flex flex-row-reverse">
           <button className="bg-blue-500 border-blue-600 text-white mt-2" onClick={() => solveUsingMooreDjikstra()}>
@@ -140,13 +135,21 @@ function Coloration() {
           </button>
         </div>
       </div>
-      {path.value != 0 && path.path.length > 0 &&
+      {path != undefined &&
       <div>
-        <h2 className="mt-8 mb-4 font-bold text-2xl">Shortest path</h2>
-        <p><span className="font-bold text-lg">Distance :</span> {path.value}</p>
-          {path.path.map((node, index) => (
-              <span className="text-lg" key={index}><span className="font-bold">{String.fromCharCode(node + "A".charCodeAt(0))}</span> <span>{((index != path.path.length - 1) ? " => " : "")}</span></span>
-          ))}
+        <h2 className="mt-8 mb-4 font-bold text-2xl">Shortest paths</h2>
+        {[...path.keys()].map((key) => {
+          const element = path.get(key)!
+          return (
+            <div className="mb-8">
+              <h3 className="mb-2 font-bold text-xl"> Objectif : {String.fromCharCode(element.path[0] + "A".charCodeAt(0))} ={">"} {String.fromCharCode(element.path[element.path.length - 1] + "A".charCodeAt(0))}</h3>
+              <p><span className="font-bold text-lg">Distance :</span> {element.value}</p>
+              <p><span className="font-bold text-lg">Chemin :</span></p>
+                {element.path.map((node, index) => (
+                    <span className="text-lg" key={index}><span className="font-bold">{String.fromCharCode(node + "A".charCodeAt(0))}</span> <span>{((index != element.path.length - 1) ? " => " : "")}</span></span>
+                ))}
+            </div>
+        )})}
       </div>
       }
     </>

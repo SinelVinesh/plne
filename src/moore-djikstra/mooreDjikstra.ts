@@ -4,10 +4,7 @@ export type Pi = {
     visited: boolean
 }
 
-export function getShortestPathUsingMooreDjikstra(orientedGraph: number[][], start: number, end: number): Pi {
-    if (isNaN(start) || isNaN(end) || start === end) {
-        return { value: 0, path: [start], visited: true}
-    }
+export function getShortestPathUsingMooreDjikstra(orientedGraph: number[][], start: number): Map<number,Pi> {
     const pi = new Map<number,Pi>
     const S = [start]
     pi.set(start,({ value: 0, path: [start], visited: true}))
@@ -46,7 +43,7 @@ export function getShortestPathUsingMooreDjikstra(orientedGraph: number[][], sta
         _S.splice(_S.indexOf(minPi),1)
         currentPath = pi.get(minPi)!.path
     }
-    return pi.get(end)!
+    return pi
 }
 
 function getMinPi(pi: Map<number,Pi>): number|undefined {

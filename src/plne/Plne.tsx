@@ -61,45 +61,89 @@ function Plne() {
       }
     }
   }
+  const continueSolve = (linearProgram: string) => {
+    try {
+      console.log(brunchAndBound(linearProgram))
+    } catch (e) {
+      if (e instanceof Error) {
+        console.log(e.message)
+        setError(e.message)
+
+      }
+    }
+  }
   const handleIntegerProgramming = (event: React.MouseEvent<HTMLInputElement,MouseEvent>) => {
     setIntegerProgramming((event.target as HTMLInputElement).checked)
   }
 
-  function BnBSection(branch: [number,string[]]) {
+  function solutionSection(solution:LPResult) {
     return (
-      <Collapsible
-        trigger={`x_${branch[0]}`}
-        className="mt-2 border-2 border-solid border-gray-300"
-        openedClassName="mt-2 border-4 border-solid border-gray-300"
-      >
-        <MathTex classname="h-fit ml-4 text-xl min-w-[200px]">
-          {
-            "<$>\\begin{cases} "+
-            branch[1][0]
-            +
-            "\\end{cases}</$$>"
-          }
-        </MathTex>
-        <MathTex classname="h-fit ml-4 text-xl min-w-[200px]">
-          {
-            "<$>\\begin{cases}"+
-            branch[1][1] +
-            "\\end{cases}</$$>"
-          }
-        </MathTex>
-      </Collapsible>
+        <div>
+          <h2 className="mt-4 mb-8 text-2xl font-bold">Solution non entiere du problem </h2>
+          <MathTex classname="h-fit ml-4 text-xl min-w-[200px]">
+            {
+                "<$>\\begin{cases}" +
+                solution.coefficients.map((coefficient) => {
+                  return `x_{${coefficient.order}} = ${formatFrac(coefficient.value)}`
+                }).join("\\\\") +
+                "\\\\Z= " + formatFrac(solution.Z) +
+                "\\end{cases}</$$>"
+            }
+          </MathTex>
+        </div>
+    )
+  }
+
+  function BnBSection(branch: [number, string[]]) {
+    return (
+        <Collapsible
+            trigger={`x_${branch[0]}`}
+            className="mt-2 border-2 border-solid border-gray-300"
+            openedClassName="mt-2 border-2 border-solid border-gray-300"
+        >
+          <MathTex classname="h-fit ml-4 text-xl min-w-[200px]">
+            {
+                "<$>\\begin{cases} " +
+                branch[1][0]
+                +
+                "\\end{cases}</$$>"
+            }
+          </MathTex>
+          <div className="flex flex-row-reverse">
+            <button className="bg-blue-500 border-blue-600 text-white mt-2" onClick={() => continueSolve(branch[1][0])}>
+              Solve
+            </button>
+          </div>
+          <MathTex classname="h-fit ml-4 text-xl min-w-[200px]">
+            {
+                "<$>\\begin{cases}" +
+                branch[1][1] +
+                "\\end{cases}</$$>"
+            }
+          </MathTex>
+          <div className="flex flex-row-reverse">
+            <button className="bg-blue-500 border-blue-600 text-white mt-2" onClick={() => continueSolve(branch[1][1])}>
+              Solve
+            </button>
+          </div>
+        </Collapsible>
     )
   }
 
   function generateBrunchAndBoundSections() {
     const branchNodes = []
     if (PLNESolution != undefined) {
+      console.log(PLNESolution)
+      branchNodes.push(solutionSection(PLNESolution.solution))
       PLNESolution.branches = new Map([...PLNESolution.branches.entries()].sort((a,b) => a[0] - b[0]))
       for (const branch of PLNESolution.branches) {
         branchNodes.push(BnBSection(branch))
       }
     }
-    setBnBSections(branchNodes)
+    const wrapper = (<Collapsible trigger={'Solution'}
+                                  className="mt-2 border-2 border-solid border-gray-300 font-bold"
+                                  openedClassName="mt-2 border-2 border-solid border-gray-300 font-bold">{branchNodes}</Collapsible>)
+    setBnBSections([wrapper])
   }
 
 

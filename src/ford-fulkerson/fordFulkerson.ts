@@ -29,7 +29,7 @@ export function getMaximumFlowData(graph: FlowArc[][], source: number, sink: num
             if (arc.mark === "+") {
                 graphCopy[arc.from][arc.to].flow += minFlow
             } else {
-                graphCopy[arc.to][arc.from].flow -= minFlow
+                graphCopy[arc.from][arc.to].flow -= minFlow
             }
         }
 

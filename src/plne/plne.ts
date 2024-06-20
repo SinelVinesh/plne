@@ -9,8 +9,7 @@ export type LPResult = {
 }
 
 export type BnBResult = {
-  Z: number,
-  coefficients: Coefficient[]
+  solution: LPResult,
   branches: Map<number,string[]>
 }
 
@@ -37,8 +36,10 @@ export function brunchAndBound(linearProgram: string) {
 function brunchAndBoundRecursive(objective: Objective, constraints: Constraint[]): BnBResult {
   const twoPhaseSolution = twoPhaseSimplexe(copy(objective), copy(constraints))
   const result: BnBResult = {
-    Z: twoPhaseSolution.Z,
-    coefficients: twoPhaseSolution.coefficients,
+    solution: {
+      Z: twoPhaseSolution.Z,
+      coefficients: twoPhaseSolution.coefficients
+    },
     branches: new Map<number, string[]>()
   }
   for (const coefficient of twoPhaseSolution.coefficients) {
@@ -81,6 +82,7 @@ function buildProblem(objective: Objective, constraints: Constraint[], constrain
     }
     problem += `${constraint.operation} ${constraint.rightHandSide}\\\\`
   }
+  problem = problem.slice(0, problem.length - 2)
   return problem
 }
 
