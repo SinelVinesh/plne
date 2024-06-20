@@ -1,6 +1,6 @@
 import MathTex from "react-mathtex";
-import React, {useState} from "react";
-import {BnBResult, brunchAndBound, LPResult, solveLP} from "./plne.ts";
+import React, {useEffect, useState} from "react";
+import {BnBGraphNode, brunchAndBound, LPResult, solveLP} from "./plne.ts";
 
 import Fraction from "fraction.js";
 import Collapsible from "react-collapsible";
@@ -16,12 +16,14 @@ function formatFrac(value: number) {
 
 function Plne() {
   const [linearProgram, setLinearProgram] = useState("");
+  const [originalLinearProblem, setOriginalLinearProgram] = useState("");
   const [integerProgrammingOutput, setIntegerProgrammingOutput] = useState("");
   const [integerProgramming, setIntegerProgramming] = useState(false);
   const [solution, setSolution] = useState<LPResult|undefined>(undefined)
   const [error, setError] = useState<string>("")
-  const [PLNESolution, setPLNESolution] = useState<BnBResult|undefined>(undefined)
-  const [BnBSections, setBnBSections] = useState<JSX.Element[]>([])
+  const [BnBSections, setBnBSections] = useState<JSX.Element|undefined>()
+  const [uniqueId, setUniqueId] = useState(0)
+  const [BnBGraph, setBnBGraph] = useState<BnBGraphNode[]>([])
   const updateLinearProgram = (input: string) => {
     setError("")
     const re = /\n/g
@@ -48,8 +50,10 @@ function Plne() {
   const handleSolve = () => {
     try {
       if (integerProgramming) {
-        setPLNESolution(brunchAndBound(linearProgram))
-        generateBrunchAndBoundSections()
+        const result = brunchAndBound(linearProgram)
+        setOriginalLinearProgram(linearProgram)
+        setBnBGraph([{id: uniqueId, value:result, children: []}])
+        setUniqueId(uniqueId+1)
       } else {
         setSolution(solveLP(linearProgram))
       }
@@ -61,9 +65,15 @@ function Plne() {
       }
     }
   }
-  const continueSolve = (linearProgram: string) => {
+  const continueSolve = (linearProgram: string, parentId: number, parendBranch: number, parentLP: number) => {
     try {
-      console.log(brunchAndBound(linearProgram))
+      const result = brunchAndBound(linearProgram, originalLinearProblem)
+      const parent = BnBGraph.find((node) => node.id == parentId)!
+      const node = {id: uniqueId, value:result, children: [], parentBranch: parendBranch, parentLP: parentLP}
+      parent.children.push(node)
+      BnBGraph.push(node)
+      setBnBGraph([...BnBGraph])
+      setUniqueId(uniqueId+1)
     } catch (e) {
       if (e instanceof Error) {
         console.log(e.message)
@@ -72,6 +82,7 @@ function Plne() {
       }
     }
   }
+
   const handleIntegerProgramming = (event: React.MouseEvent<HTMLInputElement,MouseEvent>) => {
     setIntegerProgramming((event.target as HTMLInputElement).checked)
   }
@@ -94,58 +105,92 @@ function Plne() {
     )
   }
 
-  function BnBSection(branch: [number, string[]]) {
+  function BnBSection(branch: [number, string[]], parentId: number, lp1Node: BnBGraphNode|undefined, lp2Node: BnBGraphNode|undefined) {
     return (
         <Collapsible
             trigger={`x_${branch[0]}`}
             className="mt-2 border-2 border-solid border-gray-300"
             openedClassName="mt-2 border-2 border-solid border-gray-300"
         >
-          <MathTex classname="h-fit ml-4 text-xl min-w-[200px]">
-            {
-                "<$>\\begin{cases} " +
-                branch[1][0]
-                +
-                "\\end{cases}</$$>"
+          <Collapsible
+            trigger={"LP1"}
+            className="mt-2 border-2 border-solid border-gray-300"
+            openedClassName="mt-2 border-2 border-solid border-gray-300"
+          >
+            <MathTex classname="h-fit ml-4 text-xl min-w-[200px]">
+              {
+                  "<$>\\begin{cases} " +
+                  branch[1][0]
+                  +
+                  "\\end{cases}</$$>"
+              }
+            </MathTex>
+            <div className="flex flex-row-reverse">
+              <button className="bg-blue-500 border-blue-600 text-white mt-2" onClick={() => continueSolve(branch[1][0],parentId,branch[0],1)}>
+                Solve
+              </button>
+            </div>
+            {lp1Node != undefined &&
+              generateBrunchAndBoundSections(lp1Node)
             }
-          </MathTex>
-          <div className="flex flex-row-reverse">
-            <button className="bg-blue-500 border-blue-600 text-white mt-2" onClick={() => continueSolve(branch[1][0])}>
-              Solve
-            </button>
-          </div>
-          <MathTex classname="h-fit ml-4 text-xl min-w-[200px]">
-            {
-                "<$>\\begin{cases}" +
-                branch[1][1] +
-                "\\end{cases}</$$>"
+          </Collapsible>
+          <Collapsible
+              trigger={"LP2"}
+              className="mt-2 border-2 border-solid border-gray-300"
+              openedClassName="mt-2 border-2 border-solid border-gray-300"
+          >
+            <MathTex classname="h-fit ml-4 text-xl min-w-[200px]">
+              {
+                  "<$>\\begin{cases}" +
+                  branch[1][1] +
+                  "\\end{cases}</$$>"
+              }
+            </MathTex>
+            <div className="flex flex-row-reverse">
+              <button className="bg-blue-500 border-blue-600 text-white mt-2"
+                      onClick={() => continueSolve(branch[1][1],parentId,branch[0],2)}>
+                Solve
+              </button>
+            </div>
+            {lp2Node != undefined &&
+                generateBrunchAndBoundSections(lp2Node)
             }
-          </MathTex>
-          <div className="flex flex-row-reverse">
-            <button className="bg-blue-500 border-blue-600 text-white mt-2" onClick={() => continueSolve(branch[1][1])}>
-              Solve
-            </button>
-          </div>
+          </Collapsible>
         </Collapsible>
     )
   }
 
-  function generateBrunchAndBoundSections() {
+  function generateBrunchAndBoundSections(node: BnBGraphNode): JSX.Element {
     const branchNodes = []
-    if (PLNESolution != undefined) {
-      console.log(PLNESolution)
-      branchNodes.push(solutionSection(PLNESolution.solution))
-      PLNESolution.branches = new Map([...PLNESolution.branches.entries()].sort((a,b) => a[0] - b[0]))
-      for (const branch of PLNESolution.branches) {
-        branchNodes.push(BnBSection(branch))
+    const solution = node.value
+    if (solution != undefined) {
+      console.log(solution)
+      branchNodes.push(solutionSection(solution.solution))
+      solution.branches = new Map([...solution.branches.entries()].sort((a,b) => a[0] - b[0]))
+      for (const branch of solution.branches) {
+        let lp1Node = undefined
+        let lp2Node = undefined
+        if (node.children.length > 0) {
+          lp1Node = node.children.find((child) => child.parentBranch == branch[0] && child.parentLP == 1)
+          lp2Node = node.children.find((child) => child.parentBranch == branch[0] && child.parentLP == 2)
+        }
+        branchNodes.push(BnBSection(branch,node.id, lp1Node,lp2Node))
       }
     }
-    const wrapper = (<Collapsible trigger={'Solution'}
-                                  className="mt-2 border-2 border-solid border-gray-300 font-bold"
-                                  openedClassName="mt-2 border-2 border-solid border-gray-300 font-bold">{branchNodes}</Collapsible>)
-    setBnBSections([wrapper])
+      return (<Collapsible trigger={'Solution'}
+                          className="mt-2 border-2 border-solid border-gray-300 font-bold"
+                          openedClassName="mt-2 border-2 border-solid border-gray-300 font-bold">{branchNodes}</Collapsible>)
   }
 
+  function updateBnBSections() {
+    if (BnBGraph != undefined && BnBGraph.length > 0) {
+      setBnBSections(generateBrunchAndBoundSections(BnBGraph[0]))
+    }
+  }
+
+  useEffect(() => {
+    updateBnBSections()
+  }, [BnBGraph]);
 
   return (
     <>
@@ -199,9 +244,10 @@ function Plne() {
         <h2 className="mb-8 text-xl font-bold text-red-400">{error}</h2>
       </div>
       }
-      {PLNESolution != undefined &&
+      {
+        BnBSections != undefined &&
         <div id="branch-bound-section" className="mt-4">
-          {BnBSections}
+          {BnBSections != undefined && BnBSections}
         </div>
       }
     </>

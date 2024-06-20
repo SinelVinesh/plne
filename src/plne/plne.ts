@@ -13,6 +13,14 @@ export type BnBResult = {
   branches: Map<number,string[]>
 }
 
+export type BnBGraphNode = {
+  id: number,
+  parentBranch?: number,
+  parentLP?:number,
+  value: BnBResult
+  children: BnBGraphNode[]
+}
+
 const coefficientRe = /[-\d/]*x_[\d+]/g
 const valueRe = /[-\d/]*/
 const orderRe = /(?<=x_)\d+/
@@ -26,14 +34,14 @@ export function solveLP(linearProgram: string) {
   return twoPhaseSimplexe(objective, constraints)
 }
 
-export function brunchAndBound(linearProgram: string) {
+export function brunchAndBound(linearProgram: string, originalLinearProgram: string = "") {
   const lines = linearProgram.split("\\\\")
   const constraints = getConstraints(lines.slice(1,lines.length))
   const objective = getObjective(lines[0])
-  return brunchAndBoundRecursive(objective, constraints)
+  return brunchAndBoundRecursive(objective, constraints, originalLinearProgram)
 }
 
-function brunchAndBoundRecursive(objective: Objective, constraints: Constraint[]): BnBResult {
+function brunchAndBoundRecursive(objective: Objective, constraints: Constraint[], originalLinearProgram: string): BnBResult {
   const twoPhaseSolution = twoPhaseSimplexe(copy(objective), copy(constraints))
   const result: BnBResult = {
     solution: {
@@ -41,6 +49,11 @@ function brunchAndBoundRecursive(objective: Objective, constraints: Constraint[]
       coefficients: twoPhaseSolution.coefficients
     },
     branches: new Map<number, string[]>()
+  }
+  if (originalLinearProgram != "") {
+    const lines = originalLinearProgram.split("\\\\")
+    constraints = getConstraints(lines.slice(1,lines.length))
+    objective = getObjective(lines[0])
   }
   for (const coefficient of twoPhaseSolution.coefficients) {
     if (coefficient.value % 1 !== 0) {
