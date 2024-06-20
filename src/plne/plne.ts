@@ -38,6 +38,7 @@ export function brunchAndBound(linearProgram: string, originalLinearProgram: str
   const lines = linearProgram.split("\\\\")
   const constraints = getConstraints(lines.slice(1,lines.length))
   const objective = getObjective(lines[0])
+  // console.log(brunchAndBoundRecursiveAuto(objective, constraints, {Z: NaN, coefficients: []}, {value: NaN}, 0, []))
   return brunchAndBoundRecursive(objective, constraints, originalLinearProgram)
 }
 
@@ -99,9 +100,14 @@ function buildProblem(objective: Objective, constraints: Constraint[], constrain
   return problem
 }
 
-function brunchAndBoundRecursiveAuto(objective: Objective, constraints: Constraint[], result: LPResult, solution: {value: number}, depth: number = 0): LPResult {
-
+function brunchAndBoundRecursiveAuto(objective: Objective, constraints: Constraint[], result: LPResult, solution: {value: number}, depth: number = 0, solutionRegistry: LPResult[]): LPResult {
   const twoPhaseSolution = twoPhaseSimplexe(copy(objective), copy(constraints))
+  for (const solution of solutionRegistry) {
+    if (solution.coefficients.every((coefficient, index) => coefficient.value == twoPhaseSolution.coefficients[index].value)) {
+      return result
+    }
+  }
+  solutionRegistry.push(twoPhaseSolution)
   const optimalSolution = calculateSolution(twoPhaseSolution.coefficients, objective.coefficients)
   for (const coefficient of twoPhaseSolution.coefficients) {
     if (coefficient.value % 1 !== 0) {
@@ -110,13 +116,13 @@ function brunchAndBoundRecursiveAuto(objective: Objective, constraints: Constrai
         operation: "\\leq",
         rightHandSide: Math.floor(coefficient.value)
       }
-      const leqResult: LPResult = brunchAndBoundRecursiveAuto(objective, [...constraints, leqConstraint],result, solution, depth + 1)
+      const leqResult: LPResult = brunchAndBoundRecursiveAuto(objective, [...constraints, leqConstraint],result, solution, depth + 1,solutionRegistry)
       const geqConstraint: Constraint = {
         coefficients: [{order: coefficient.order, value: 1}],
         operation: "\\geq",
         rightHandSide: Math.ceil(coefficient.value)
       }
-      const geqResult: LPResult = brunchAndBoundRecursiveAuto(objective, [...constraints, geqConstraint],result, solution, depth + 1)
+      const geqResult: LPResult = brunchAndBoundRecursiveAuto(objective, [...constraints, geqConstraint],result, solution, depth + 1,solutionRegistry)
       if (objective.type == "max") {
         if (calculateSolution(leqResult.coefficients, objective.coefficients) > calculateSolution(geqResult.coefficients, objective.coefficients)) {
           return leqResult

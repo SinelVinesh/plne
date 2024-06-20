@@ -109,13 +109,13 @@ function Plne() {
     return (
         <Collapsible
             trigger={`x_${branch[0]}`}
-            className="mt-2 border-2 border-solid border-gray-300"
-            openedClassName="mt-2 border-2 border-solid border-gray-300"
+            className="p-2 mt-2 border-2 border-solid border-gray-300"
+            openedClassName="p-2 mt-2 border-2 border-solid border-gray-300"
         >
           <Collapsible
             trigger={"LP1"}
-            className="mt-2 border-2 border-solid border-gray-300"
-            openedClassName="mt-2 border-2 border-solid border-gray-300"
+            className="p-2 mt-2 border-2 border-solid border-gray-300"
+            openedClassName="p-2 mt-2 border-2 border-solid border-gray-300"
           >
             <MathTex classname="h-fit ml-4 text-xl min-w-[200px]">
               {
@@ -126,7 +126,11 @@ function Plne() {
               }
             </MathTex>
             <div className="flex flex-row-reverse">
-              <button className="bg-blue-500 border-blue-600 text-white mt-2" onClick={() => continueSolve(branch[1][0],parentId,branch[0],1)}>
+              <button className="bg-blue-500 border-blue-600 text-white mt-2" onClick={(e) => {
+                // disable button
+                e.currentTarget.disabled = true
+                continueSolve(branch[1][0],parentId,branch[0],1)
+              }}>
                 Solve
               </button>
             </div>
@@ -136,8 +140,8 @@ function Plne() {
           </Collapsible>
           <Collapsible
               trigger={"LP2"}
-              className="mt-2 border-2 border-solid border-gray-300"
-              openedClassName="mt-2 border-2 border-solid border-gray-300"
+              className="p-2 mt-2 border-2 border-solid border-gray-300"
+              openedClassName="p-2 mt-2 border-2 border-solid border-gray-300"
           >
             <MathTex classname="h-fit ml-4 text-xl min-w-[200px]">
               {
@@ -148,7 +152,11 @@ function Plne() {
             </MathTex>
             <div className="flex flex-row-reverse">
               <button className="bg-blue-500 border-blue-600 text-white mt-2"
-                      onClick={() => continueSolve(branch[1][1],parentId,branch[0],2)}>
+                      onClick={(e) => {
+                        // disable button
+                        e.currentTarget.disabled = true
+                        continueSolve(branch[1][1],parentId,branch[0],2)
+                      }}>
                 Solve
               </button>
             </div>
@@ -178,8 +186,8 @@ function Plne() {
       }
     }
       return (<Collapsible trigger={'Solution'}
-                          className="mt-2 border-2 border-solid border-gray-300 font-bold"
-                          openedClassName="mt-2 border-2 border-solid border-gray-300 font-bold">{branchNodes}</Collapsible>)
+                          className="p-2 mt-2 border-2 border-solid border-gray-300 font-bold"
+                          openedClassName="p-2 mt-2 border-2 border-solid border-gray-300 font-bold">{branchNodes}</Collapsible>)
   }
 
   function updateBnBSections() {
@@ -201,7 +209,7 @@ function Plne() {
             rows={6}
             cols={30}
             id={"linear-program"}
-            className="px-2 py-2 border border-gray-300"
+            className="p-2 py-2 border border-gray-300"
             onChange={(e) => updateLinearProgram(e.target.value)}
           />
           <div className="flex gap-1">
