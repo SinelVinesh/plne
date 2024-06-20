@@ -1,8 +1,9 @@
 import MathTex from "react-mathtex";
 import React, {useState} from "react";
-import {brunchAndBound, LPResult, solveLP} from "./plne.ts";
+import {BnBResult, brunchAndBound, LPResult, solveLP} from "./plne.ts";
 
 import Fraction from "fraction.js";
+import Collapsible from "react-collapsible";
 
 function formatFrac(value: number) {
   const fraction = new Fraction(value)
@@ -12,12 +13,15 @@ function formatFrac(value: number) {
   return `${fraction.s == 1 ? "" : "-"}${fraction.n}/${fraction.d}`
 }
 
+
 function Plne() {
   const [linearProgram, setLinearProgram] = useState("");
   const [integerProgrammingOutput, setIntegerProgrammingOutput] = useState("");
   const [integerProgramming, setIntegerProgramming] = useState(false);
   const [solution, setSolution] = useState<LPResult|undefined>(undefined)
   const [error, setError] = useState<string>("")
+  const [PLNESolution, setPLNESolution] = useState<BnBResult|undefined>(undefined)
+  const [BnBSections, setBnBSections] = useState<JSX.Element[]>([])
   const updateLinearProgram = (input: string) => {
     setError("")
     const re = /\n/g
@@ -44,7 +48,8 @@ function Plne() {
   const handleSolve = () => {
     try {
       if (integerProgramming) {
-        setSolution(brunchAndBound(linearProgram))
+        setPLNESolution(brunchAndBound(linearProgram))
+        generateBrunchAndBoundSections()
       } else {
         setSolution(solveLP(linearProgram))
       }
@@ -59,6 +64,45 @@ function Plne() {
   const handleIntegerProgramming = (event: React.MouseEvent<HTMLInputElement,MouseEvent>) => {
     setIntegerProgramming((event.target as HTMLInputElement).checked)
   }
+
+  function BnBSection(branch: [number,string[]]) {
+    return (
+      <Collapsible
+        trigger={`x_${branch[0]}`}
+        className="mt-2 border-2 border-solid border-gray-300"
+        openedClassName="mt-2 border-4 border-solid border-gray-300"
+      >
+        <MathTex classname="h-fit ml-4 text-xl min-w-[200px]">
+          {
+            "<$>\\begin{cases} "+
+            branch[1][0]
+            +
+            "\\end{cases}</$$>"
+          }
+        </MathTex>
+        <MathTex classname="h-fit ml-4 text-xl min-w-[200px]">
+          {
+            "<$>\\begin{cases}"+
+            branch[1][1] +
+            "\\end{cases}</$$>"
+          }
+        </MathTex>
+      </Collapsible>
+    )
+  }
+
+  function generateBrunchAndBoundSections() {
+    const branchNodes = []
+    if (PLNESolution != undefined) {
+      PLNESolution.branches = new Map([...PLNESolution.branches.entries()].sort((a,b) => a[0] - b[0]))
+      for (const branch of PLNESolution.branches) {
+        branchNodes.push(BnBSection(branch))
+      }
+    }
+    setBnBSections(branchNodes)
+  }
+
+
   return (
     <>
       <h1 className="mb-8">Linear program Solver</h1>
@@ -68,7 +112,7 @@ function Plne() {
             rows={6}
             cols={30}
             id={"linear-program"}
-            className="border border-gray-300"
+            className="px-2 py-2 border border-gray-300"
             onChange={(e) => updateLinearProgram(e.target.value)}
           />
           <div className="flex gap-1">
@@ -110,6 +154,11 @@ function Plne() {
         <h2 className="mt-8 mb-4 text-2xl font-bold text-red-400">Error</h2>
         <h2 className="mb-8 text-xl font-bold text-red-400">{error}</h2>
       </div>
+      }
+      {PLNESolution != undefined &&
+        <div id="branch-bound-section" className="mt-4">
+          {BnBSections}
+        </div>
       }
     </>
   )

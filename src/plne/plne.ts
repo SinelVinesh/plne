@@ -8,6 +8,12 @@ export type LPResult = {
   coefficients: Coefficient[]
 }
 
+export type BnBResult = {
+  Z: number,
+  coefficients: Coefficient[]
+  branches: Map<number,string[]>
+}
+
 const coefficientRe = /[-\d/]*x_[\d+]/g
 const valueRe = /[-\d/]*/
 const orderRe = /(?<=x_)\d+/
@@ -25,10 +31,60 @@ export function brunchAndBound(linearProgram: string) {
   const lines = linearProgram.split("\\\\")
   const constraints = getConstraints(lines.slice(1,lines.length))
   const objective = getObjective(lines[0])
-  return brunchAndBoundRecursive(objective, constraints, {Z: NaN, coefficients: []}, {value: NaN})
+  return brunchAndBoundRecursive(objective, constraints)
 }
 
-function brunchAndBoundRecursive(objective: Objective, constraints: Constraint[], result: LPResult, solution: {value: number}, depth: number = 0): LPResult {
+function brunchAndBoundRecursive(objective: Objective, constraints: Constraint[]): BnBResult {
+  const twoPhaseSolution = twoPhaseSimplexe(copy(objective), copy(constraints))
+  const result: BnBResult = {
+    Z: twoPhaseSolution.Z,
+    coefficients: twoPhaseSolution.coefficients,
+    branches: new Map<number, string[]>()
+  }
+  for (const coefficient of twoPhaseSolution.coefficients) {
+    if (coefficient.value % 1 !== 0) {
+      const leqConstraint: Constraint = {
+        coefficients: [{order: coefficient.order, value: 1}],
+        operation: "\\leq",
+        rightHandSide: Math.floor(coefficient.value)
+      }
+      const geqConstraint: Constraint = {
+        coefficients: [{order: coefficient.order, value: 1}],
+        operation: "\\geq",
+        rightHandSide: Math.ceil(coefficient.value)
+      }
+      result.branches.set(coefficient.order, [buildProblem(objective, constraints, leqConstraint), buildProblem(objective, constraints, geqConstraint)])
+    }
+  }
+  return result
+}
+
+function buildProblem(objective: Objective, constraints: Constraint[], constraint: Constraint): string {
+  let problem = "";
+  problem += `${objective.type}\\quad`
+  for (let i = 0; i < objective.coefficients.length; i++) {
+    const coefficient = objective.coefficients[i]
+    if (i > 0 && coefficient.value > 0) {
+      problem += "+"
+    }
+    problem += `${coefficient.value == 1 ? "" : coefficient.value == -1 ? "- " : coefficient.value}x_${coefficient.order}`
+  }
+  problem += "\\\\"
+  const allConstraints = [...constraints, constraint]
+  for (const constraint of allConstraints) {
+    for (let i = 0; i < constraint.coefficients.length; i++) {
+      const coefficient = constraint.coefficients[i]
+      if (i > 0 && coefficient.value > 0) {
+        problem += "+"
+      }
+      problem += `${coefficient.value == 1 ? "" : coefficient.value == -1 ? "- " : coefficient.value}x_${coefficient.order}`
+    }
+    problem += `${constraint.operation} ${constraint.rightHandSide}\\\\`
+  }
+  return problem
+}
+
+function brunchAndBoundRecursiveAuto(objective: Objective, constraints: Constraint[], result: LPResult, solution: {value: number}, depth: number = 0): LPResult {
 
   const twoPhaseSolution = twoPhaseSimplexe(copy(objective), copy(constraints))
   const optimalSolution = calculateSolution(twoPhaseSolution.coefficients, objective.coefficients)
@@ -39,13 +95,13 @@ function brunchAndBoundRecursive(objective: Objective, constraints: Constraint[]
         operation: "\\leq",
         rightHandSide: Math.floor(coefficient.value)
       }
-      const leqResult: LPResult = brunchAndBoundRecursive(objective, [...constraints, leqConstraint],result, solution, depth + 1)
+      const leqResult: LPResult = brunchAndBoundRecursiveAuto(objective, [...constraints, leqConstraint],result, solution, depth + 1)
       const geqConstraint: Constraint = {
         coefficients: [{order: coefficient.order, value: 1}],
         operation: "\\geq",
         rightHandSide: Math.ceil(coefficient.value)
       }
-      const geqResult: LPResult = brunchAndBoundRecursive(objective, [...constraints, geqConstraint],result, solution, depth + 1)
+      const geqResult: LPResult = brunchAndBoundRecursiveAuto(objective, [...constraints, geqConstraint],result, solution, depth + 1)
       if (objective.type == "max") {
         if (calculateSolution(leqResult.coefficients, objective.coefficients) > calculateSolution(geqResult.coefficients, objective.coefficients)) {
           return leqResult
@@ -305,7 +361,7 @@ function twoPhaseSimplexe(objective: Objective, constraints: Constraint[]): LPRe
   simplexe(objective.type, matrix)
   const optimalSolution: Coefficient[] = [];
   for (let i = 1; i < matrix.rows-1;i++) {
-    if (matrix.get(i,0) < decisionVariables) {
+    if (matrix.get(i,0) <= decisionVariables) {
       optimalSolution.push({
         order: matrix.get(i,0),
         value: matrix.get(i,matrix.columns-1)
