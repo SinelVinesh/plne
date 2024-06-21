@@ -172,7 +172,6 @@ function Plne() {
     const branchNodes = []
     const solution = node.value
     if (solution != undefined) {
-      console.log(solution)
       branchNodes.push(solutionSection(solution.solution))
       solution.branches = new Map([...solution.branches.entries()].sort((a,b) => a[0] - b[0]))
       for (const branch of solution.branches) {

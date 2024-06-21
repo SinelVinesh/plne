@@ -38,7 +38,7 @@ export function brunchAndBound(linearProgram: string, originalLinearProgram: str
   const lines = linearProgram.split("\\\\")
   const constraints = getConstraints(lines.slice(1,lines.length))
   const objective = getObjective(lines[0])
-  // console.log(brunchAndBoundRecursiveAuto(objective, constraints, {Z: NaN, coefficients: []}, {value: NaN}, 0, []))
+  console.log(brunchAndBoundRecursiveAuto(objective, constraints, {Z: NaN, coefficients: []}, {value: NaN}, 0, []))
   return brunchAndBoundRecursive(objective, constraints, originalLinearProgram)
 }
 
@@ -82,7 +82,7 @@ function buildProblem(objective: Objective, constraints: Constraint[], constrain
     if (i > 0 && coefficient.value > 0) {
       problem += "+"
     }
-    problem += `${coefficient.value == 1 ? "" : coefficient.value == -1 ? "- " : coefficient.value}x_${coefficient.order}`
+    problem += `${coefficient.value == 1 ? "" : coefficient.value == -1 ? "-" : coefficient.value}x_${coefficient.order}`
   }
   problem += "\\\\"
   const allConstraints = [...constraints, constraint]
@@ -92,7 +92,7 @@ function buildProblem(objective: Objective, constraints: Constraint[], constrain
       if (i > 0 && coefficient.value > 0) {
         problem += "+"
       }
-      problem += `${coefficient.value == 1 ? "" : coefficient.value == -1 ? "- " : coefficient.value}x_${coefficient.order}`
+      problem += `${coefficient.value == 1 ? "" : coefficient.value == -1 ? "-" : coefficient.value}x_${coefficient.order}`
     }
     problem += `${constraint.operation} ${constraint.rightHandSide}\\\\`
   }
@@ -101,47 +101,67 @@ function buildProblem(objective: Objective, constraints: Constraint[], constrain
 }
 
 function brunchAndBoundRecursiveAuto(objective: Objective, constraints: Constraint[], result: LPResult, solution: {value: number}, depth: number = 0, solutionRegistry: LPResult[]): LPResult {
-  const twoPhaseSolution = twoPhaseSimplexe(copy(objective), copy(constraints))
-  for (const solution of solutionRegistry) {
-    if (solution.coefficients.every((coefficient, index) => coefficient.value == twoPhaseSolution.coefficients[index].value)) {
-      return result
-    }
-  }
-  solutionRegistry.push(twoPhaseSolution)
-  const optimalSolution = calculateSolution(twoPhaseSolution.coefficients, objective.coefficients)
-  for (const coefficient of twoPhaseSolution.coefficients) {
-    if (coefficient.value % 1 !== 0) {
-      const leqConstraint: Constraint = {
-        coefficients: [{order: coefficient.order, value: 1}],
-        operation: "\\leq",
-        rightHandSide: Math.floor(coefficient.value)
-      }
-      const leqResult: LPResult = brunchAndBoundRecursiveAuto(objective, [...constraints, leqConstraint],result, solution, depth + 1,solutionRegistry)
-      const geqConstraint: Constraint = {
-        coefficients: [{order: coefficient.order, value: 1}],
-        operation: "\\geq",
-        rightHandSide: Math.ceil(coefficient.value)
-      }
-      const geqResult: LPResult = brunchAndBoundRecursiveAuto(objective, [...constraints, geqConstraint],result, solution, depth + 1,solutionRegistry)
-      if (objective.type == "max") {
-        if (calculateSolution(leqResult.coefficients, objective.coefficients) > calculateSolution(geqResult.coefficients, objective.coefficients)) {
-          return leqResult
-        } else {
-          return geqResult
-        }
-      } else {
-        if (calculateSolution(leqResult.coefficients, objective.coefficients) < calculateSolution(geqResult.coefficients, objective.coefficients)) {
-          return leqResult
-        } else {
-          return geqResult
-        }
+  try {
+    const twoPhaseSolution = twoPhaseSimplexe(copy(objective), copy(constraints))
+    for (const solution of solutionRegistry) {
+      if (solution.coefficients.every((coefficient, index) => coefficient.value == twoPhaseSolution.coefficients[index].value)) {
+        return result
       }
     }
+    solutionRegistry.push(twoPhaseSolution)
+    const optimalSolution = calculateSolution(twoPhaseSolution.coefficients, objective.coefficients)
+    for (const coefficient of twoPhaseSolution.coefficients) {
+      const temp = new Fraction(coefficient.value)
+      if (temp.d != 1 && temp.n != 0 && temp.n != temp.d) {
+        const leqConstraint: Constraint = {
+          coefficients: [{order: coefficient.order, value: 1}],
+          operation: "\\leq",
+          rightHandSide: Math.floor(coefficient.value)
+        }
+        const leqConstraints = [...constraints]
+        if (depth > 0) {
+          leqConstraints.pop()
+          leqConstraints.push(leqConstraint)
+        } else {
+          leqConstraints.push(leqConstraint)
+        }
+        const leqResult: LPResult = brunchAndBoundRecursiveAuto(objective, leqConstraints, result, solution, depth + 1, solutionRegistry)
+        const geqConstraint: Constraint = {
+          coefficients: [{order: coefficient.order, value: 1}],
+          operation: "\\geq",
+          rightHandSide: Math.ceil(coefficient.value)
+        }
+        const geqConstraints = [...constraints]
+        if (depth > 0) {
+          geqConstraints.pop()
+          geqConstraints.push(geqConstraint)
+        } else {
+          geqConstraints.push(geqConstraint)
+        }
+        const geqResult: LPResult = brunchAndBoundRecursiveAuto(objective, geqConstraints, result, solution, depth + 1, solutionRegistry)
+        if (objective.type == "max") {
+          if (calculateSolution(leqResult.coefficients, objective.coefficients) > calculateSolution(geqResult.coefficients, objective.coefficients)) {
+            return leqResult
+          } else {
+            return geqResult
+          }
+        } else {
+          if (calculateSolution(leqResult.coefficients, objective.coefficients) < calculateSolution(geqResult.coefficients, objective.coefficients)) {
+            return leqResult
+          } else {
+            return geqResult
+          }
+        }
+      }
+    }
+    if (isNaN(solution.value) || (objective.type == "max" && solution.value < optimalSolution) || (objective.type == "min" && solution.value > optimalSolution)) {
+      result = twoPhaseSolution
+      solution.value = optimalSolution
+    }
+    return result
+  } catch (e) {
+    return result
   }
-  if (isNaN(solution.value) || (objective.type == "max" && solution.value < optimalSolution) || (objective.type == "min" && solution.value > optimalSolution)) {
-    result = twoPhaseSolution
-  }
-  return result
 }
 
 function calculateSolution(optimalCoefficient: Coefficient[], objective: Coefficient[]) {
