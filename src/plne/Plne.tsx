@@ -16,7 +16,6 @@ function formatFrac(value: number) {
 
 function Plne() {
   const [linearProgram, setLinearProgram] = useState("");
-  const [originalLinearProblem, setOriginalLinearProgram] = useState("");
   const [integerProgrammingOutput, setIntegerProgrammingOutput] = useState("");
   const [integerProgramming, setIntegerProgramming] = useState(false);
   const [solution, setSolution] = useState<LPResult|undefined>(undefined)
@@ -51,7 +50,6 @@ function Plne() {
     try {
       if (integerProgramming) {
         const result = brunchAndBound(linearProgram)
-        setOriginalLinearProgram(linearProgram)
         setBnBGraph([{id: uniqueId, value:result, children: []}])
         setUniqueId(uniqueId+1)
       } else {
@@ -67,7 +65,7 @@ function Plne() {
   }
   const continueSolve = (linearProgram: string, parentId: number, parendBranch: number, parentLP: number) => {
     try {
-      const result = brunchAndBound(linearProgram, originalLinearProblem)
+      const result = brunchAndBound(linearProgram)
       const parent = BnBGraph.find((node) => node.id == parentId)!
       const node = {id: uniqueId, value:result, children: [], parentBranch: parendBranch, parentLP: parentLP}
       parent.children.push(node)
@@ -76,9 +74,12 @@ function Plne() {
       setUniqueId(uniqueId+1)
     } catch (e) {
       if (e instanceof Error) {
-        console.log(e.message)
-        setError(e.message)
-
+        const parent = BnBGraph.find((node) => node.id == parentId)!
+        const node = {id: uniqueId, value:undefined, children: [], parentBranch: parendBranch, parentLP: parentLP}
+        parent.children.push(node)
+        BnBGraph.push(node)
+        setBnBGraph([...BnBGraph])
+        setUniqueId(uniqueId+1)
       }
     }
   }
@@ -183,10 +184,12 @@ function Plne() {
         }
         branchNodes.push(BnBSection(branch,node.id, lp1Node,lp2Node))
       }
-    }
       return (<Collapsible trigger={'Solution'}
                           className="p-2 mt-2 border-2 border-solid border-gray-300 font-bold"
                           openedClassName="p-2 mt-2 border-2 border-solid border-gray-300 font-bold">{branchNodes}</Collapsible>)
+    } else {
+      return (<p className="p-2 mt-2 border-gray-300 font-bold text-red-400">Pas de solution</p>)
+    }
   }
 
   function updateBnBSections() {
