@@ -3,9 +3,12 @@ import {Coefficient, Constraint, Objective, ProblemType} from "../model.ts";
 import Fraction from "fraction.js";
 import {copy} from "../util.ts";
 
+const variableMap = new Map<number,string>()
+
 export type LPResult = {
   Z: number,
-  coefficients: Coefficient[]
+  coefficients: Coefficient[],
+  matrix?: Matrix
 }
 
 export type BnBResult = {
@@ -28,6 +31,7 @@ const operationRe = /\\leq|\\geq|=/
 
 
 export function solveLP(linearProgram: string) {
+  variableMap.clear()
   const lines = linearProgram.split("\\\\")
   const constraints = getConstraints(lines.slice(1,lines.length))
   const objective = getObjective(lines[0])
@@ -47,7 +51,8 @@ function brunchAndBoundRecursive(objective: Objective, constraints: Constraint[]
   const result: BnBResult = {
     solution: {
       Z: twoPhaseSolution.Z,
-      coefficients: twoPhaseSolution.coefficients
+      coefficients: twoPhaseSolution.coefficients,
+      matrix: twoPhaseSolution.matrix
     },
     branches: new Map<number, string[]>()
   }
@@ -184,6 +189,7 @@ function getCoefficients(expression: string, type: string = "Objective"): Coeffi
       throw new Error(`One of the objective ${type.toLowerCase()} is missing`)
     }
     const value = new Fraction(valueMatch[0] == "-" ? "-1" : valueMatch[0] == "" ? "1" : valueMatch[0]).valueOf()
+    variableMap.set(order, `x_${order}`)
     coefficients.push({
       order: order,
       value: value
@@ -218,11 +224,15 @@ function getConstraint(constraint: string): Constraint {
 
 function standardizeProblem(objective: Objective, constraints: Constraint[], artificialVariables: number[]): number {
   let maxOrder = objective.coefficients[objective.coefficients.length - 1].order
+  let sCounter = 0
+  let aCounter = 0
   for (let i = 0; i < constraints.length; i++) {
     const constraint = constraints[i]
     switch (constraint.operation) {
       case "\\leq":
         maxOrder += 1
+        sCounter += 1
+        variableMap.set(maxOrder, `s_${sCounter}`)
         constraint.coefficients.push({
           order: maxOrder,
           value: 1
@@ -230,6 +240,8 @@ function standardizeProblem(objective: Objective, constraints: Constraint[], art
         break
       case "\\geq":
         maxOrder += 1
+        sCounter += 1
+        variableMap.set(maxOrder, `s_${sCounter}`)
         constraint.coefficients.push({
           order: maxOrder,
           value: -1
@@ -243,6 +255,8 @@ function standardizeProblem(objective: Objective, constraints: Constraint[], art
     const constraint = constraints[i]
     if (constraint.operation == "\\geq" || constraint.operation == "=") {
       maxOrder += 1
+      aCounter += 1
+      variableMap.set(maxOrder, `a_${aCounter}`)
       constraint.coefficients.push({
         order: maxOrder,
         value: 1
@@ -374,7 +388,6 @@ function twoPhaseSimplexe(objective: Objective, constraints: Constraint[]): LPRe
     matrix = auxiliaryMatrix
     baseVariables = auxiliaryBaseVariables
     calculateZ(matrix, objective)
-    // printMatrix(matrix)
   }
   if (matrix == undefined || baseVariables == undefined) {
     baseVariables = getBaseVariables(constraints)
@@ -392,7 +405,8 @@ function twoPhaseSimplexe(objective: Objective, constraints: Constraint[]): LPRe
   }
   return {
     Z: -matrix.get(matrix.rows-1,matrix.columns-1),
-    coefficients: optimalSolution
+    coefficients: optimalSolution,
+    matrix: matrix
   }
 }
 
@@ -495,4 +509,8 @@ function removeColumn(matrix: Matrix, column: number) {
       return
     }
   }
+}
+
+export function getVariableRepresentation(order: number): string {
+  return variableMap.get(order) ?? ``
 }

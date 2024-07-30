@@ -1,6 +1,6 @@
 import MathTex from "react-mathtex";
 import React, {useEffect, useState} from "react";
-import {BnBGraphNode, brunchAndBound, LPResult, solveLP} from "./plne.ts";
+import {BnBGraphNode, brunchAndBound, getVariableRepresentation, LPResult, solveLP} from "./plne.ts";
 
 import Fraction from "fraction.js";
 import Collapsible from "react-collapsible";
@@ -50,10 +50,13 @@ function Plne() {
     try {
       if (integerProgramming) {
         const result = brunchAndBound(linearProgram)
+        setSolution(undefined)
         setBnBGraph([{id: uniqueId, value:result, children: []}])
         setUniqueId(uniqueId+1)
       } else {
+        setBnBSections(undefined)
         setSolution(solveLP(linearProgram))
+        console.log(solveLP(linearProgram))
       }
     } catch (e) {
       if (e instanceof Error) {
@@ -90,47 +93,91 @@ function Plne() {
 
   function solutionSection(solution:LPResult) {
     return (
-        <div>
-          <h2 className="mt-4 mb-8 text-2xl font-bold">Solution non entiere du problem </h2>
-          <MathTex classname="h-fit ml-4 text-xl min-w-[200px]">
-            {
-                "<$>\\begin{cases}" +
-                solution.coefficients.map((coefficient) => {
-                  return `x_{${coefficient.order}} = ${formatFrac(coefficient.value)}`
-                }).join("\\\\") +
-                "\\\\Z= " + formatFrac(solution.Z) +
-                "\\end{cases}</$$>"
-            }
-          </MathTex>
+      <div>
+        <h2 className="mt-4 mb-8 text-2xl font-bold">Solution non entiere du problem </h2>
+        <MathTex classname="h-fit ml-4 text-xl min-w-[200px]">
+          {
+            "<$>\\begin{cases}" +
+            solution.coefficients.map((coefficient) => {
+              return `x_{${coefficient.order}} = ${formatFrac(coefficient.value)}`
+            }).join("\\\\") +
+            "\\\\Z= " + formatFrac(solution.Z) +
+            "\\end{cases}</$$>"
+          }
+        </MathTex>
+        <div className="flex justify-center mt-4">
+          <table>
+            <tbody>
+            {solution?.matrix && (
+              solution?.matrix.to2DArray().map((row, i) => {
+                return (
+                  <tr key={i}>
+                    {row.map((cell, j) => {
+                      if (i == 0 || j == 0) {
+                        return <td key={j}
+                                   className="border-2 w-10 font-bold">{getVariableRepresentation(cell)}</td>
+                      } else {
+                        return <td key={j} className="border-2 w-10">{isNaN(cell) ? "" : formatFrac(cell)}</td>
+                      }
+                    })}
+                  </tr>
+                )
+              })
+            )}
+            </tbody>
+          </table>
         </div>
+      </div>
     )
   }
 
-  function BnBSection(branch: [number, string[]], parentId: number, lp1Node: BnBGraphNode|undefined, lp2Node: BnBGraphNode|undefined) {
+  function BnBSection(branch: [number, string[]], parentId: number, lp1Node: BnBGraphNode | undefined, lp2Node: BnBGraphNode | undefined) {
     return (
+      <Collapsible
+        trigger={`x_${branch[0]}`}
+        className="p-2 mt-2 border-2 border-solid border-gray-300"
+        openedClassName="p-2 mt-2 border-2 border-solid border-gray-300"
+      >
         <Collapsible
-            trigger={`x_${branch[0]}`}
-            className="p-2 mt-2 border-2 border-solid border-gray-300"
-            openedClassName="p-2 mt-2 border-2 border-solid border-gray-300"
+          trigger={"LP1"}
+          className="p-2 mt-2 border-2 border-solid border-gray-300"
+          openedClassName="p-2 mt-2 border-2 border-solid border-gray-300"
         >
-          <Collapsible
-            trigger={"LP1"}
-            className="p-2 mt-2 border-2 border-solid border-gray-300"
-            openedClassName="p-2 mt-2 border-2 border-solid border-gray-300"
-          >
-            <MathTex classname="h-fit ml-4 text-xl min-w-[200px]">
-              {
-                  "<$>\\begin{cases} " +
-                  branch[1][0]
-                  +
-                  "\\end{cases}</$$>"
-              }
-            </MathTex>
+          <MathTex classname="h-fit ml-4 text-xl min-w-[200px]">
+            {
+              "<$>\\begin{cases} " +
+              branch[1][0]
+              +
+              "\\end{cases}</$$>"
+            }
+          </MathTex>
+          <div className="flex justify-center mt-4">
+            <table>
+                <tbody>
+                {lp1Node?.value?.solution.matrix && (
+                  lp1Node?.value?.solution.matrix.to2DArray().map((row, i) => {
+                    return (
+                      <tr key={i}>
+                        {row.map((cell, j) => {
+                          if (i == 0 || j == 0) {
+                            return <td key={j}
+                                       className="border-2 w-10 font-bold">{getVariableRepresentation(cell)}</td>
+                          } else {
+                            return <td key={j} className="border-2 w-10">{isNaN(cell) ? "" : formatFrac(cell)}</td>
+                          }
+                        })}
+                      </tr>
+                    )
+                  })
+                )}
+                </tbody>
+              </table>
+            </div>
             <div className="flex flex-row-reverse">
               <button className="bg-blue-500 border-blue-600 text-white mt-2" onClick={(e) => {
                 // disable button
                 e.currentTarget.disabled = true
-                continueSolve(branch[1][0],parentId,branch[0],1)
+                continueSolve(branch[1][0], parentId, branch[0], 1)
               }}>
                 Solve
               </button>
@@ -139,33 +186,55 @@ function Plne() {
               generateBrunchAndBoundSections(lp1Node)
             }
           </Collapsible>
-          <Collapsible
-              trigger={"LP2"}
-              className="p-2 mt-2 border-2 border-solid border-gray-300"
-              openedClassName="p-2 mt-2 border-2 border-solid border-gray-300"
-          >
-            <MathTex classname="h-fit ml-4 text-xl min-w-[200px]">
-              {
-                  "<$>\\begin{cases}" +
-                  branch[1][1] +
-                  "\\end{cases}</$$>"
-              }
-            </MathTex>
-            <div className="flex flex-row-reverse">
-              <button className="bg-blue-500 border-blue-600 text-white mt-2"
-                      onClick={(e) => {
-                        // disable button
-                        e.currentTarget.disabled = true
-                        continueSolve(branch[1][1],parentId,branch[0],2)
-                      }}>
-                Solve
-              </button>
-            </div>
-            {lp2Node != undefined &&
-                generateBrunchAndBoundSections(lp2Node)
+        <Collapsible
+          trigger={"LP2"}
+          className="p-2 mt-2 border-2 border-solid border-gray-300"
+          openedClassName="p-2 mt-2 border-2 border-solid border-gray-300"
+        >
+          <MathTex classname="h-fit ml-4 text-xl min-w-[200px]">
+            {
+              "<$>\\begin{cases}" +
+              branch[1][1] +
+              "\\end{cases}</$$>"
             }
-          </Collapsible>
+          </MathTex>
+          <div className="flex justify-center mt-4">
+            <table>
+              <tbody>
+              {lp2Node?.value?.solution.matrix && (
+                lp2Node?.value?.solution.matrix.to2DArray().map((row, i) => {
+                  return (
+                    <tr key={i}>
+                      {row.map((cell, j) => {
+                        if (i == 0 || j == 0) {
+                          return <td key={j}
+                                     className="border-2 w-10 font-bold">{getVariableRepresentation(cell)}</td>
+                        } else {
+                          return <td key={j} className="border-2 w-10">{isNaN(cell) ? "" : formatFrac(cell)}</td>
+                        }
+                      })}
+                    </tr>
+                  )
+                })
+              )}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex flex-row-reverse">
+            <button className="bg-blue-500 border-blue-600 text-white mt-2"
+                    onClick={(e) => {
+                      // disable button
+                      e.currentTarget.disabled = true
+                      continueSolve(branch[1][1], parentId, branch[0], 2)
+                    }}>
+              Solve
+            </button>
+          </div>
+          {lp2Node != undefined &&
+            generateBrunchAndBoundSections(lp2Node)
+          }
         </Collapsible>
+      </Collapsible>
     )
   }
 
@@ -174,7 +243,7 @@ function Plne() {
     const solution = node.value
     if (solution != undefined) {
       branchNodes.push(solutionSection(solution.solution))
-      solution.branches = new Map([...solution.branches.entries()].sort((a,b) => a[0] - b[0]))
+      solution.branches = new Map([...solution.branches.entries()].sort((a, b) => a[0] - b[0]))
       for (const branch of solution.branches) {
         let lp1Node = undefined
         let lp2Node = undefined
@@ -182,10 +251,10 @@ function Plne() {
           lp1Node = node.children.find((child) => child.parentBranch == branch[0] && child.parentLP == 1)
           lp2Node = node.children.find((child) => child.parentBranch == branch[0] && child.parentLP == 2)
         }
-        branchNodes.push(BnBSection(branch,node.id, lp1Node,lp2Node))
+        branchNodes.push(BnBSection(branch, node.id, lp1Node, lp2Node))
       }
       return (<Collapsible trigger={'Solution'}
-                          className="p-2 mt-2 border-2 border-solid border-gray-300 font-bold"
+                           className="p-2 mt-2 border-2 border-solid border-gray-300 font-bold"
                           openedClassName="p-2 mt-2 border-2 border-solid border-gray-300 font-bold">{branchNodes}</Collapsible>)
     } else {
       return (<p className="p-2 mt-2 border-gray-300 font-bold text-red-400">Pas de solution</p>)
@@ -235,7 +304,8 @@ function Plne() {
           Solve
         </button>
       </div>
-      {solution != undefined && solution.coefficients.length != 0 && <div>
+      {solution != undefined && solution.coefficients.length != 0 && (
+        <div>
             <h2 className="mt-4 mb-8 text-2xl font-bold">Solution optimal du problem</h2>
             <MathTex classname="h-fit ml-4 text-xl min-w-[200px]">
               {
@@ -247,7 +317,29 @@ function Plne() {
                 "\\end{cases}</$$>"
               }
             </MathTex>
+          <div className="flex justify-center mt-4">
+            <table>
+              <tbody>
+              {solution.matrix && (
+                solution.matrix.to2DArray().map((row, i) => {
+                  return (
+                    <tr key={i}>
+                      {row.map((cell, j) => {
+                        if (i == 0 || j == 0) {
+                          return <td key={j} className="border-2 w-10 font-bold">{getVariableRepresentation(cell)}</td>
+                        } else {
+                          return <td key={j} className="border-2 w-10">{ isNaN(cell) ? "" : formatFrac(cell)}</td>
+                        }
+                      })}
+                    </tr>
+                  )
+                })
+              )}
+              </tbody>
+            </table>
+          </div>
         </div>
+        )
       }
       {error != "" && <div>
         <h2 className="mt-8 mb-4 text-2xl font-bold text-red-400">Error</h2>
