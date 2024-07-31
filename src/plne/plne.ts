@@ -360,30 +360,57 @@ function twoPhaseSimplexe(objective: Objective, constraints: Constraint[]): LPRe
     if (z != 0) {
       throw new Error("The problem has no solution")
     }
-    // Remove artificial variable which are not in the base
+
+
     let bases = auxiliaryMatrix.getColumn(0)
-    bases = bases.slice(1, bases.length)
-    bases = bases.slice(0, bases.length - 1)
+    bases = bases.slice(1, bases.length -1)
+    let baseContainsArtificial = false
     for (const artificial of artificialVariables) {
-      let skip = false
       for (const base of bases) {
         if (artificial == base) {
-          skip = true
-          break
+          baseContainsArtificial = true
         }
       }
-      if (!skip) {
-        removeColumn(auxiliaryMatrix, artificial)
-      }
     }
+    if (!baseContainsArtificial) {
+        //Case 2 : Optimal is 0 and no artificial variables are in the base
+        for (const artificial of artificialVariables) {
+            const index = auxiliaryMatrix.getRow(0).findIndex((value) => value == artificial)
+            if (index != -1) {
+                removeColumn(auxiliaryMatrix, index)
+            }
+        }
+    } else {
+        // Case 3: Optimal is 0 and there are artificial variables in the base
+        // We remove all non-base variables
+        let firstRow = auxiliaryMatrix.getRow(0)
+        for (const cell of firstRow) {
+          const cellInBase = bases.findIndex((value) => value == cell) != -1
+          if (!cellInBase) {
+            const index = auxiliaryMatrix.getRow(0).findIndex((value) => value == cell)
+            if (index != -1) {
+              removeColumn(auxiliaryMatrix, index)
+            }
+          }
+        }
+        // We remove all variable from the original problem that has a negative coefficient
+        const lastRow = auxiliaryMatrix.getRow(auxiliaryMatrix.rows - 1)
+        firstRow = auxiliaryMatrix.getRow(0)
+        for (let i = 1; i < lastRow.length-1; i++) {
+          if (lastRow[i] < 0 && firstRow[i] <= decisionVariables) {
+            removeColumn(auxiliaryMatrix, firstRow[i])
+          }
+        }
+    }
+
     // Remove non-base variables with a Z value of 1
-    const lastRow = auxiliaryMatrix.getRow(auxiliaryMatrix.rows - 1)
-    const firstRow = auxiliaryMatrix.getRow(0)
-    for (let i = 1; i < lastRow.length; i++) {
-      if (lastRow[i] == 1) {
-        removeColumn(auxiliaryMatrix, firstRow[i])
-      }
-    }
+    // const lastRow = auxiliaryMatrix.getRow(auxiliaryMatrix.rows - 1)
+    // const firstRow = auxiliaryMatrix.getRow(0)
+    // for (let i = 1; i < lastRow.length; i++) {
+    //   if (lastRow[i] > 0) {
+    //     removeColumn(auxiliaryMatrix, firstRow[i])
+    //   }
+    // }
 
     matrix = auxiliaryMatrix
     baseVariables = auxiliaryBaseVariables
